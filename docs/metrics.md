@@ -38,9 +38,14 @@ same `kind`. Weekday-to-weekday comparison is never a default. Anomalies
 (> 2 SD from the trailing baseline) are surfaced and annotated, never silently
 excluded.
 
-## M1 status
+## Implementation status
 
-M1 implements: entry (with `min_dwell_seconds` and separate enter/exit
-thresholds), occupied seconds, and dwell p50/p90 for a single hard-coded zone.
-Passerby, capture rate, traffic share, and normalization arrive with the schema
-in M2.
+The edge agent computes, for a single hard-coded zone: entry (with
+`min_dwell_seconds` and separate enter/exit thresholds), occupied seconds,
+dwell p50/p90, passerby (catchment is the polygon dilated by
+`catchment_frac`, a normalized-space stand-in for the "2 m equivalent" until
+ground-plane calibration), and capture rate.
+
+Traffic share and normalization need site-wide totals and a trailing baseline,
+so they arrive with the cloud schema. Person-seconds is defined but not yet
+reported.

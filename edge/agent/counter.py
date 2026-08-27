@@ -17,6 +17,8 @@ class _TrackState:
     state: _State = _State.OUTSIDE
     first_inside_t: float = 0.0  # when the ground point first crossed in
     pending_since: float = 0.0
+    entered_polygon: bool = False  # ground point was inside the zone polygon at least once
+    seen_in_catchment: bool = False  # ground point reached the zone's catchment
 
 
 def percentile(values: list[float], q: float) -> float:
@@ -35,6 +37,7 @@ def percentile(values: list[float], q: float) -> float:
 @dataclass
 class ZoneStats:
     entries: int = 0
+    passersby: int = 0
     occupied_seconds: float = 0.0
     dwell_samples: list[float] = field(default_factory=list)
 
@@ -46,13 +49,22 @@ class ZoneStats:
     def dwell_p90(self) -> float:
         return percentile(self.dwell_samples, 90)
 
+    @property
+    def capture_rate(self) -> float:
+        """spec 6.4: entries / (entries + passersby). 0.0 when nobody came near."""
+        denom = self.entries + self.passersby
+        return self.entries / denom if denom else 0.0
+
 
 class ZoneCounter:
-    """Per-zone entry / occupancy / dwell accounting.
+    """Per-zone entry / occupancy / dwell / passerby accounting.
 
     Metric definitions are spec 6.4 and must not drift. Feed it one call per
     processed frame with the current live tracks; call `end_track` when the
     tracker drops an id, and `finalize` once at end of stream.
+
+    A track is classified as a passerby when it is removed: it reached the
+    zone's catchment but its ground point never entered the zone polygon.
     """
 
     def __init__(self, zone: Zone, min_dwell_seconds: float = 3.0) -> None:
@@ -86,6 +98,10 @@ class ZoneCounter:
 
         inside_enter = self.zone.contains_enter(gp)
         inside_stay = self.zone.contains_stay(gp)
+        if inside_enter:
+            ts.entered_polygon = True
+        if self.zone.contains_catchment(gp):
+            ts.seen_in_catchment = True
 
         if ts.state is _State.OUTSIDE:
             if inside_enter:
@@ -103,10 +119,16 @@ class ZoneCounter:
             self.stats.dwell_samples.append(t - ts.first_inside_t)
             ts.state = _State.OUTSIDE
 
+    def _classify_on_remove(self, ts: _TrackState, t: float) -> None:
+        if ts.state is _State.INSIDE:
+            self.stats.dwell_samples.append(t - ts.first_inside_t)
+        if ts.seen_in_catchment and not ts.entered_polygon:
+            self.stats.passersby += 1
+
     def end_track(self, tid: int, t: float) -> None:
         ts = self._tracks.pop(tid, None)
-        if ts is not None and ts.state is _State.INSIDE:
-            self.stats.dwell_samples.append(t - ts.first_inside_t)
+        if ts is not None:
+            self._classify_on_remove(ts, t)
 
     def finalize(self, t: float) -> None:
         if self._last_t is not None:
@@ -114,6 +136,5 @@ class ZoneCounter:
             if dt > 0 and self._occupied:
                 self.stats.occupied_seconds += dt
         for ts in self._tracks.values():
-            if ts.state is _State.INSIDE:
-                self.stats.dwell_samples.append(t - ts.first_inside_t)
+            self._classify_on_remove(ts, t)
         self._tracks.clear()

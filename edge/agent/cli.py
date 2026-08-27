@@ -54,7 +54,11 @@ def main(argv: list[str] | None = None) -> int:
         return _fail(f"--max-frames must be >= 0, got {args.max_frames}")
 
     try:
-        zone = parse_zone(args.zone, exit_margin=cfg.exit_margin_frac)
+        zone = parse_zone(
+            args.zone,
+            exit_margin=cfg.exit_margin_frac,
+            catchment_margin=cfg.catchment_frac,
+        )
     except ValueError as exc:
         return _fail(f"--zone: {exc}")
 
@@ -139,6 +143,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"mean detections   {detections_total / frames:.2f} per frame")
     print(f"zone              {zone.name}")
     print(f"entries           {s.entries}")
+    print(f"passersby         {s.passersby}")
+    print(f"capture rate      {s.capture_rate:.0%}")
     print(f"occupied seconds  {s.occupied_seconds:.1f}")
     print(f"dwell p50 / p90   {s.dwell_p50:.1f}s / {s.dwell_p90:.1f}s")
     return 0
