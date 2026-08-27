@@ -6,22 +6,22 @@ import the constants and helpers from `shared/` once they exist.
 
 ## Definitions (spec Section 6.4)
 
-- **Entry** — a tracked person's ground point transitions outside → inside a zone
+- **Entry.** A tracked person's ground point transitions outside → inside a zone
   polygon and remains inside for ≥ `min_dwell_seconds` (default 3s). The
   threshold suppresses boundary jitter.
-- **Occupied seconds** — wall-clock seconds during which ≥ 1 person was inside.
+- **Occupied seconds.** Wall-clock seconds during which ≥ 1 person was inside.
   Not a sum over people.
-- **Person-seconds** — sum over all people of time inside. A different metric
+- **Person-seconds.** Sum over all people of time inside. A different metric
   from occupied seconds; label it differently and never confuse the two.
-- **Dwell** — per-track duration inside a zone, reported as median and p90. Never
+- **Dwell.** Per-track duration inside a zone, reported as median and p90. Never
   as a mean: one person who left a bag in frame ruins a mean.
-- **Passerby** — a track whose ground point enters the zone's *catchment*
+- **Passerby.** A track whose ground point enters the zone's *catchment*
   (a configurable dilation of the polygon, default 2 m equivalent) but never
   enters the zone itself.
-- **Capture rate** — `entries / (entries + passersby)`. The most valuable number
+- **Capture rate.** `entries / (entries + passersby)`. The most valuable number
   in the product: it separates appeal from location. A stall on a dead corridor
   with 40% capture is a good tenant in a bad spot.
-- **Traffic share** — `zone entries / site_totals.total_people` for the same
+- **Traffic share.** `zone entries / site_totals.total_people` for the same
   bucket. The number that survives busy days and slow days.
 
 ## Ground point

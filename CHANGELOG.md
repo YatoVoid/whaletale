@@ -4,7 +4,7 @@ One entry per milestone from the project spec, Section 14.
 
 ## [Unreleased]
 
-### M1 — Prove the pipeline
+### M1: Prove the pipeline
 - Repository scaffold: layout, `.gitignore`, `.env.example`, pre-commit hooks,
   CI (lint, type-check, tests, secret scan, license audit), branch protection.
 - Edge pipeline proof: PyAV decode, RT-DETR person detection, Norfair tracking,
