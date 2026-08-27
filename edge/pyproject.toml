@@ -1,0 +1,77 @@
+[project]
+name = "whaletale-edge"
+version = "0.1.0"
+description = "WhaleTale edge agent: capture, detect, track, zone logic, aggregate"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "av>=13.1.0",
+    "torch>=2.5.0",
+    "torchvision>=0.20.0",  # RT-DETR image processor needs it
+    "transformers>=4.47.0",
+    "norfair>=2.2.0",
+    "shapely>=2.0.6",
+    "numpy>=1.26.0,<2.0.0",  # ceiling comes from norfair 2.3
+    "pillow>=11.0.0",
+]
+
+[project.scripts]
+whaletale-edge = "agent.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.8.6",
+    "mypy>=1.14.0",
+]
+
+[tool.uv]
+package = true
+
+# M1 dev boxes and the Jetson path run CPU inference. A real x86 edge box with
+# an RTX 3060 overrides this with the CUDA wheel index.
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]
+torchvision = [{ index = "pytorch-cpu" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["agent", "sync", "onboarding"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true
+files = ["agent", "sync", "onboarding", "tests"]
+
+# norfair ships a partial __all__; its Tracker/Detection are public in practice.
+[[tool.mypy.overrides]]
+module = "norfair"
+implicit_reexport = true
+
+# transformers / HF processors are largely untyped at the call boundary.
+[[tool.mypy.overrides]]
+module = "agent.detect"
+disallow_untyped_calls = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+# cli.py is wiring, exercised by the smoke run in docs/runbook.md, not units.
+omit = ["agent/cli.py", "tests/*"]

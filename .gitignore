@@ -1,0 +1,69 @@
+# --- Secrets / config ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials*.json
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+.venv/
+venv/
+
+# --- Node / Next.js ---
+node_modules/
+.next/
+out/
+dist/
+*.tsbuildinfo
+.eslintcache
+
+# --- Databases (edge SQLite, local Postgres dumps) ---
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.sql.gz
+
+# --- Model weights / caches (never in git, see docs/licenses.md) ---
+models/
+.hf_cache/
+.smoke/
+*.onnx
+*.pt
+*.pth
+*.engine
+*.trt
+*.safetensors
+.cache/
+.hf_cache/
+
+# --- Frame / video artifacts (NEVER commit, privacy claim depends on it) ---
+*.mp4
+*.mkv
+*.avi
+*.mov
+*.jpg
+*.jpeg
+*.png
+*.bmp
+frames/
+captures/
+!docs/**/*.png
+!web/**/*.svg
+
+# --- Editor / OS ---
+.DS_Store
+.idea/
+.vscode/
+*.swp
