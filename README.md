@@ -49,9 +49,30 @@ p50/p90, plus the achievable decode+inference FPS.
 Model weights download on first run to `EDGE_HF_CACHE` (default `edge/.hf_cache`)
 and are git-ignored.
 
-## Cloud / web
+## Cloud (M2: schema and attribution)
 
-Not built yet. Arrive in M5 and M6.
+Postgres schema, synthetic seed, and the attribution / metrics / normalization
+logic. No API or UI yet (M5, M6).
+
+```bash
+docker compose -f docker/compose.cloud.yml up -d   # Postgres + Redis
+cd cloud
+uv sync
+uv run alembic upgrade head
+WHALETALE_TEST_DATABASE_URL=postgresql+psycopg://whaletale:whaletale@localhost:5432/whaletale \
+  uv run pytest
+```
+
+Without `WHALETALE_TEST_DATABASE_URL` the tests start a throwaway Postgres
+container (needs Docker). Every schema change is an Alembic migration; CI fails
+if the models and the migration head disagree.
+
+Shared types live in `shared/schemas/` (Pydantic v2). The cloud ORM mirrors them
+and a test fails on drift. TypeScript generation arrives with the web app in M6.
+
+## Web
+
+Not built yet. Arrives in M6.
 
 ## Development
 
