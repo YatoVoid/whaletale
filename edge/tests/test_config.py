@@ -20,6 +20,7 @@ def test_from_env_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("EDGE_MIN_DWELL_SECONDS", "5")
     monkeypatch.setenv("EDGE_EXIT_MARGIN_FRAC", "0.05")
     monkeypatch.setenv("EDGE_CATCHMENT_FRAC", "0.2")
+    monkeypatch.setenv("EDGE_BUCKET_SECONDS", "300")
     c = Config.from_env()
     assert c.target_fps == 7.0
     assert c.device == "cuda"
@@ -28,6 +29,7 @@ def test_from_env_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
     assert c.min_dwell_seconds == 5.0
     assert c.exit_margin_frac == 0.05
     assert c.catchment_frac == 0.2
+    assert c.bucket_seconds == 300.0
 
 
 def test_from_env_defaults_when_unset(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -40,6 +42,7 @@ def test_from_env_defaults_when_unset(monkeypatch: pytest.MonkeyPatch) -> None:
         "EDGE_MIN_DWELL_SECONDS",
         "EDGE_EXIT_MARGIN_FRAC",
         "EDGE_CATCHMENT_FRAC",
+        "EDGE_BUCKET_SECONDS",
     ):
         monkeypatch.delenv(k, raising=False)
     c = Config.from_env()
@@ -47,6 +50,7 @@ def test_from_env_defaults_when_unset(monkeypatch: pytest.MonkeyPatch) -> None:
     assert c.model_id == "PekingU/rtdetr_r50vd"
     assert c.score_threshold == 0.5
     assert c.catchment_frac == 0.08
+    assert c.bucket_seconds == 900.0
 
 
 def test_non_numeric_env_value_names_the_variable(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -66,6 +70,8 @@ def test_non_numeric_env_value_names_the_variable(monkeypatch: pytest.MonkeyPatc
         {"min_dwell_seconds": -0.1},
         {"exit_margin_frac": -1},
         {"catchment_frac": -0.01},
+        {"bucket_seconds": 0},
+        {"bucket_seconds": -60},
     ],
 )
 def test_invalid_field_values_rejected(kwargs: dict[str, object]) -> None:

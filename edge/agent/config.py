@@ -41,6 +41,10 @@ class Config:
     # stand-in for the spec's "2 m equivalent" until ground-plane calibration;
     # tune per camera.
     catchment_frac: float = 0.08
+    # Rollup bucket width in stream-time seconds (spec 6.5). 15 minutes is the
+    # usual foot-traffic granularity. A run shorter than one bucket produces a
+    # single bucket.
+    bucket_seconds: float = 900.0
 
     def __post_init__(self) -> None:
         if self.target_fps <= 0:
@@ -55,6 +59,8 @@ class Config:
             raise ConfigError(f"exit_margin_frac must be >= 0, got {self.exit_margin_frac}")
         if self.catchment_frac < 0:
             raise ConfigError(f"catchment_frac must be >= 0, got {self.catchment_frac}")
+        if self.bucket_seconds <= 0:
+            raise ConfigError(f"bucket_seconds must be > 0, got {self.bucket_seconds}")
 
     @staticmethod
     def from_env() -> Config:
@@ -68,4 +74,5 @@ class Config:
             min_dwell_seconds=_env_float("EDGE_MIN_DWELL_SECONDS", 3.0),
             exit_margin_frac=_env_float("EDGE_EXIT_MARGIN_FRAC", 0.02),
             catchment_frac=_env_float("EDGE_CATCHMENT_FRAC", 0.08),
+            bucket_seconds=_env_float("EDGE_BUCKET_SECONDS", 900.0),
         )

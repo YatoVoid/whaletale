@@ -40,11 +40,19 @@ excluded.
 
 ## Implementation status
 
-The edge agent computes, for a single hard-coded zone: entry (with
-`min_dwell_seconds` and separate enter/exit thresholds), occupied seconds,
-person-seconds, dwell p50/p90, passerby (catchment is the polygon dilated by
-`catchment_frac`, a normalized-space stand-in for the "2 m equivalent" until
-ground-plane calibration), and capture rate.
+The edge agent computes, per fixed stream-time bucket (`bucket_seconds`,
+default 900) for a single hard-coded zone: entry (with `min_dwell_seconds` and
+separate enter/exit thresholds), occupied seconds, person-seconds, dwell
+p50/p90, passerby (catchment is the polygon dilated by `catchment_frac`, a
+normalized-space stand-in for the "2 m equivalent" until ground-plane
+calibration), and capture rate.
+
+Bucketing rule (assumption, pending spec confirmation): time metrics (occupied,
+person-seconds) split at the boundary; event metrics (entries, dwell samples,
+passersby) are attributed to the bucket where the event resolves (an entry to
+where `min_dwell` is met, a dwell to where the track leaves or the run ends, a
+passerby to where the track is dropped). Track identity is continuous across
+boundaries.
 
 Traffic share and normalization need site-wide totals and a trailing baseline,
 so they arrive with the cloud schema.

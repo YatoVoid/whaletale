@@ -5,8 +5,8 @@ import sys
 import time
 
 from agent import __version__
+from agent.aggregate import RunAggregator
 from agent.config import Config, ConfigError
-from agent.counter import ZoneCounter
 from agent.decode import DecodeError, decode_frames
 from agent.zones import ground_point, parse_zone
 
@@ -85,7 +85,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.warm:
         return 0
 
-    counter = ZoneCounter(zone, min_dwell_seconds=cfg.min_dwell_seconds)
+    agg = RunAggregator(
+        zone,
+        min_dwell_seconds=cfg.min_dwell_seconds,
+        bucket_seconds=cfg.bucket_seconds,
+    )
     tracker = GroundPointTracker()
 
     prev_ids: set[int] = set()
@@ -103,8 +107,8 @@ def main(argv: list[str] | None = None) -> int:
 
             live = tracker.update(gps)
             for lost_id in prev_ids - live.keys():
-                counter.end_track(lost_id, t)
-            counter.update(t, live)
+                agg.end_track(lost_id, t)
+            agg.update(t, live)
             prev_ids = set(live)
 
             frames += 1
@@ -114,7 +118,7 @@ def main(argv: list[str] | None = None) -> int:
                 fps = frames / (now - wall_start)
                 print(
                     f"  t={t:6.1f}s  frames={frames:5d}  people={len(live):2d}  "
-                    f"entries={counter.stats.entries:3d}  pipeline_fps={fps:4.1f}",
+                    f"entries={agg.entries_so_far:3d}  pipeline_fps={fps:4.1f}",
                     flush=True,
                 )
                 next_progress = now + 2.0
@@ -129,9 +133,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"\nerror: {exc}", file=sys.stderr)
         return 1
 
-    counter.finalize(last_t)
+    buckets = agg.finalize(last_t)
     wall_elapsed = time.monotonic() - wall_start
-    s = counter.stats
+    s = agg.totals()
 
     print("\n--- run summary ---")
     if frames == 0:
@@ -142,6 +146,18 @@ def main(argv: list[str] | None = None) -> int:
     print(f"achievable FPS    {frames / wall_elapsed:.2f}  (target {args.fps:.1f})")
     print(f"mean detections   {detections_total / frames:.2f} per frame")
     print(f"zone              {zone.name}")
+
+    if len(buckets) > 1:
+        print(f"\nbuckets ({cfg.bucket_seconds:.0f}s each)")
+        print("  #  start     entries  passers  capture  occ_s  person_s")
+        for b in buckets:
+            st = b.stats
+            print(
+                f"  {b.index:<2d} {b.start:7.1f}s  {st.entries:7d}  {st.passersby:7d}  "
+                f"{st.capture_rate:6.0%}  {st.occupied_seconds:5.0f}  {st.person_seconds:8.0f}"
+            )
+        print("  run totals")
+
     print(f"entries           {s.entries}")
     print(f"passersby         {s.passersby}")
     print(f"capture rate      {s.capture_rate:.0%}")

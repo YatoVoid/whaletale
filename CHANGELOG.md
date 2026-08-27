@@ -22,6 +22,11 @@ One entry per milestone from the project spec, Section 14.
   (sum over people of time inside, distinct from occupied seconds), printed in
   the run summary. Schema, local persistence, and cloud-side traffic share are
   still open.
+- Edge rollup buckets: the run is split into fixed stream-time buckets
+  (`bucket_seconds`, default 900) with continuous track identity across
+  boundaries. Time metrics split at the boundary, event metrics land in the
+  bucket they resolve in. The summary prints a per-bucket table plus run
+  totals.
 
 <!--
 Later milestones (planned):

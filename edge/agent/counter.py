@@ -76,22 +76,21 @@ class ZoneCounter:
         self._last_t: float | None = None
         self._inside_count = 0  # tracks in INSIDE state as of _last_t
 
-    def _accrue(self, t: float) -> None:
+    def accrue_to(self, t: float) -> None:
         """Attribute the interval [_last_t, t] to the occupancy that held at
-        _last_t (no lookahead)."""
-        if self._last_t is None:
-            return
-        dt = t - self._last_t
-        if dt <= 0:
-            return
-        if self._inside_count:
-            self.stats.occupied_seconds += dt
-            self.stats.person_seconds += dt * self._inside_count
+        _last_t (no lookahead), without advancing any track. The aggregator
+        calls this at a bucket boundary so time-based metrics split cleanly
+        while entries and dwell stay attributed to the bucket they resolve in."""
+        if self._last_t is not None:
+            dt = t - self._last_t
+            if dt > 0 and self._inside_count:
+                self.stats.occupied_seconds += dt
+                self.stats.person_seconds += dt * self._inside_count
+        self._last_t = t
 
     def update(self, t: float, ground_points: dict[int, tuple[float, float]]) -> None:
         """`ground_points`: {track_id: (x, y)} for every currently live track."""
-        self._accrue(t)
-        self._last_t = t
+        self.accrue_to(t)
 
         for tid, gp in ground_points.items():
             self._advance(tid, gp, t)
@@ -139,7 +138,7 @@ class ZoneCounter:
             self._classify_on_remove(ts, t)
 
     def finalize(self, t: float) -> None:
-        self._accrue(t)
+        self.accrue_to(t)
         for ts in self._tracks.values():
             self._classify_on_remove(ts, t)
         self._tracks.clear()
