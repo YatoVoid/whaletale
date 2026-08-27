@@ -54,6 +54,16 @@ def test_loitering_on_boundary_does_not_double_count() -> None:
     assert c.stats.dwell_samples == [pytest.approx(8.0)]
 
 
+def test_finalize_closes_dwell_for_a_track_still_inside() -> None:
+    c = make_counter()
+    for t in (0.0, 1.0, 2.0, 3.0, 4.0):
+        c.update(t, {1: INSIDE})
+    c.finalize(10.0)  # stream ends with the person still in the zone
+    assert c.stats.dwell_samples == [pytest.approx(10.0)]
+    assert c.stats.dwell_p50 == pytest.approx(10.0)
+    assert c.stats.dwell_p90 == pytest.approx(10.0)
+
+
 def test_end_track_closes_open_dwell() -> None:
     c = make_counter()
     for t in (0.0, 1.0, 2.0, 3.0, 4.0):

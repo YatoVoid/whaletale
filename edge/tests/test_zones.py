@@ -53,3 +53,18 @@ def test_parse_zone_variants() -> None:
 
     with pytest.raises(ValueError):
         parse_zone("0.1,0.2,0.3")
+
+
+@pytest.mark.parametrize(
+    "spec",
+    [
+        "0.1,0.2,1.4,0.4",  # x2 out of 0..1
+        "-0.1,0.2,0.3,0.4",  # x1 out of 0..1
+        "0.4,0.2,0.2,0.4",  # x1 >= x2
+        "0.1,0.5,0.3,0.5",  # y1 >= y2
+        "a,b,c,d",  # non-numeric
+    ],
+)
+def test_parse_zone_rejects_bad_rectangles(spec: str) -> None:
+    with pytest.raises(ValueError):
+        parse_zone(spec)

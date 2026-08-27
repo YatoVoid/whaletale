@@ -5,14 +5,13 @@ import sys
 import time
 
 from agent import __version__
-from agent.config import Config
+from agent.config import Config, ConfigError
 from agent.counter import ZoneCounter
-from agent.decode import decode_frames
+from agent.decode import DecodeError, decode_frames
 from agent.zones import ground_point, parse_zone
 
 
-def _parser() -> argparse.ArgumentParser:
-    cfg = Config.from_env()
+def _parser(cfg: Config) -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="whaletale-edge",
         description="M1 pipeline proof: detect people in one hard-coded zone, count entries.",
@@ -33,30 +32,55 @@ def _parser() -> argparse.ArgumentParser:
     return p
 
 
-def main(argv: list[str] | None = None) -> int:
-    args = _parser().parse_args(argv)
-    cfg = Config.from_env()
+def _fail(msg: str) -> int:
+    print(f"error: {msg}", file=sys.stderr)
+    return 2
 
-    # Imported lazily so --help and unit tests don't pull in torch.
+
+def main(argv: list[str] | None = None) -> int:
+    try:
+        cfg = Config.from_env()
+    except ConfigError as exc:
+        return _fail(str(exc))
+
+    args = _parser(cfg).parse_args(argv)
+
+    # Cheap validation first, so a typo doesn't cost a model download.
+    if args.fps <= 0:
+        return _fail(f"--fps must be > 0, got {args.fps}")
+    if args.seconds < 0:
+        return _fail(f"--seconds must be >= 0, got {args.seconds}")
+    if args.max_frames < 0:
+        return _fail(f"--max-frames must be >= 0, got {args.max_frames}")
+
+    try:
+        zone = parse_zone(args.zone, exit_margin=cfg.exit_margin_frac)
+    except ValueError as exc:
+        return _fail(f"--zone: {exc}")
+
+    if not args.source and not args.warm:
+        return _fail("--source is required (unless --warm)")
+
+    # Imported lazily so --help, bad args, and unit tests don't pull in torch.
     from agent.detect import PersonDetector
     from agent.track import GroundPointTracker
 
     print(f"whaletale-edge {__version__}  model={args.model}  device={args.device}", flush=True)
     load_start = time.monotonic()
-    detector = PersonDetector(
-        model_id=args.model,
-        device=args.device,
-        hf_cache=cfg.hf_cache,
-        score_threshold=cfg.score_threshold,
-    )
+    try:
+        detector = PersonDetector(
+            model_id=args.model,
+            device=args.device,
+            hf_cache=cfg.hf_cache,
+            score_threshold=cfg.score_threshold,
+        )
+    except Exception as exc:  # model load fails many ways: bad id, no network, disk
+        print(f"error: could not load model {args.model!r}: {exc}", file=sys.stderr)
+        return 1
     print(f"model ready in {time.monotonic() - load_start:.1f}s", flush=True)
     if args.warm:
         return 0
-    if not args.source:
-        print("error: --source is required (unless --warm)", file=sys.stderr)
-        return 2
 
-    zone = parse_zone(args.zone, exit_margin=cfg.exit_margin_frac)
     counter = ZoneCounter(zone, min_dwell_seconds=cfg.min_dwell_seconds)
     tracker = GroundPointTracker()
 
@@ -97,6 +121,9 @@ def main(argv: list[str] | None = None) -> int:
                 break
     except KeyboardInterrupt:
         print("\ninterrupted", flush=True)
+    except DecodeError as exc:
+        print(f"\nerror: {exc}", file=sys.stderr)
+        return 1
 
     counter.finalize(last_t)
     wall_elapsed = time.monotonic() - wall_start
