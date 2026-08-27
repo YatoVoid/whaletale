@@ -28,6 +28,13 @@ Before adding any vision dependency, check its license and add a row here.
 | Numerics | `numpy` | BSD-3-Clause | 2026-08-27 |
 | Imaging | `pillow` | MIT-CMU | 2026-08-27 |
 
+## Transitive, reviewed
+
+| Package | Via | License | Note |
+|---|---|---|---|
+| `filterpy` | `norfair` | MIT | Kalman filtering |
+| `matplotlib` | `norfair` → `filterpy` | PSF-style (non-copyleft) | Allowlisted in `license_audit.py`: its bundled LICENSE text quotes GPL notices for third-party parts and trips keyword scans. Unwanted weight on an edge box; revisit trimming `filterpy`'s deps in M4. |
+
 ## Model checkpoints
 
 | Checkpoint | License | Notes |
