@@ -39,6 +39,7 @@ class ZoneStats:
     entries: int = 0
     passersby: int = 0
     occupied_seconds: float = 0.0
+    person_seconds: float = 0.0  # spec 6.4: sum over people of time inside, != occupied
     dwell_samples: list[float] = field(default_factory=list)
 
     @property
@@ -73,22 +74,29 @@ class ZoneCounter:
         self.stats = ZoneStats()
         self._tracks: dict[int, _TrackState] = {}
         self._last_t: float | None = None
-        self._occupied = False
+        self._inside_count = 0  # tracks in INSIDE state as of _last_t
+
+    def _accrue(self, t: float) -> None:
+        """Attribute the interval [_last_t, t] to the occupancy that held at
+        _last_t (no lookahead)."""
+        if self._last_t is None:
+            return
+        dt = t - self._last_t
+        if dt <= 0:
+            return
+        if self._inside_count:
+            self.stats.occupied_seconds += dt
+            self.stats.person_seconds += dt * self._inside_count
 
     def update(self, t: float, ground_points: dict[int, tuple[float, float]]) -> None:
         """`ground_points`: {track_id: (x, y)} for every currently live track."""
-        if self._last_t is not None:
-            dt = t - self._last_t
-            if dt > 0 and self._occupied:
-                # Attribute the interval [last_t, t] to the occupancy state that
-                # held at last_t (no lookahead).
-                self.stats.occupied_seconds += dt
+        self._accrue(t)
         self._last_t = t
 
         for tid, gp in ground_points.items():
             self._advance(tid, gp, t)
 
-        self._occupied = any(ts.state is _State.INSIDE for ts in self._tracks.values())
+        self._inside_count = sum(1 for ts in self._tracks.values() if ts.state is _State.INSIDE)
 
     def _advance(self, tid: int, gp: tuple[float, float], t: float) -> None:
         ts = self._tracks.get(tid)
@@ -131,10 +139,7 @@ class ZoneCounter:
             self._classify_on_remove(ts, t)
 
     def finalize(self, t: float) -> None:
-        if self._last_t is not None:
-            dt = t - self._last_t
-            if dt > 0 and self._occupied:
-                self.stats.occupied_seconds += dt
+        self._accrue(t)
         for ts in self._tracks.values():
             self._classify_on_remove(ts, t)
         self._tracks.clear()

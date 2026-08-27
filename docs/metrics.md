@@ -42,10 +42,9 @@ excluded.
 
 The edge agent computes, for a single hard-coded zone: entry (with
 `min_dwell_seconds` and separate enter/exit thresholds), occupied seconds,
-dwell p50/p90, passerby (catchment is the polygon dilated by
+person-seconds, dwell p50/p90, passerby (catchment is the polygon dilated by
 `catchment_frac`, a normalized-space stand-in for the "2 m equivalent" until
 ground-plane calibration), and capture rate.
 
 Traffic share and normalization need site-wide totals and a trailing baseline,
-so they arrive with the cloud schema. Person-seconds is defined but not yet
-reported.
+so they arrive with the cloud schema.

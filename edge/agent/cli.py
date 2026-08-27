@@ -146,6 +146,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"passersby         {s.passersby}")
     print(f"capture rate      {s.capture_rate:.0%}")
     print(f"occupied seconds  {s.occupied_seconds:.1f}")
+    print(f"person-seconds    {s.person_seconds:.1f}")
     print(f"dwell p50 / p90   {s.dwell_p50:.1f}s / {s.dwell_p90:.1f}s")
     return 0
 

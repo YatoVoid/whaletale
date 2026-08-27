@@ -92,6 +92,19 @@ def test_two_people_one_zone_occupied_is_wall_clock_not_sum() -> None:
     assert c.stats.entries == 2
     # Both inside for the intervals [1,2] and [2,3]; wall-clock, not 4.0.
     assert c.stats.occupied_seconds == pytest.approx(2.0)
+    # Person-seconds sums over people: 2 people * 2 seconds.
+    assert c.stats.person_seconds == pytest.approx(4.0)
+
+
+def test_person_seconds_equals_occupied_for_a_lone_visitor() -> None:
+    c = make_counter(min_dwell=0.0)
+    for t in (0.0, 1.0, 2.0, 3.0):
+        c.update(t, {1: INSIDE})
+    c.finalize(3.0)
+    # One person: person-seconds and occupied seconds coincide. Intervals
+    # [1,2] and [2,3]; the track is still PENDING at t=0.
+    assert c.stats.occupied_seconds == pytest.approx(2.0)
+    assert c.stats.person_seconds == pytest.approx(2.0)
 
 
 def test_catchment_only_track_is_a_passerby() -> None:

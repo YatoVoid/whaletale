@@ -18,8 +18,9 @@ One entry per milestone from the project spec, Section 14.
 ### M2: Schema + attribution
 - Edge attribution: zone catchment (polygon dilated by `catchment_frac`),
   passerby tracking (a track that reaches the catchment but never the zone
-  polygon), and capture rate `entries / (entries + passersby)`, printed in the
-  run summary. Schema, local persistence, and cloud-side traffic share are
+  polygon), capture rate `entries / (entries + passersby)`, and person-seconds
+  (sum over people of time inside, distinct from occupied seconds), printed in
+  the run summary. Schema, local persistence, and cloud-side traffic share are
   still open.
 
 <!--
