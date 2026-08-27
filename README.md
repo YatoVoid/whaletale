@@ -22,7 +22,7 @@ ever stored.
 
 ## Status
 
-M1 — pipeline proof. Single stream, person detection, one hand-coded polygon,
+M1: pipeline proof. Single stream, person detection, one hand-coded polygon,
 entry counting to console. No database, no UI. See `CHANGELOG.md` for the
 milestone list.
 

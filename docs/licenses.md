@@ -43,7 +43,7 @@ Before adding any vision dependency, check its license and add a row here.
 
 ## Planned, not yet added
 
-- `supervision` (MIT) — polygon annotation / line-crossing overlay. Not needed
+- `supervision` (MIT): polygon annotation / line-crossing overlay. Not needed
   for M1 (geometry is `shapely`); lands with the M6 zone editor overlay.
 - RT-DETR/YOLOX ONNX export, ONNX Runtime or TensorRT (M4).
 - `onvif-zeep` / `WSDiscovery` (M7).

@@ -3,7 +3,7 @@
 What to do when a site alerts. One section per milestone on how that milestone
 fails and the response.
 
-## M1 — pipeline proof
+## M1: pipeline proof
 
 Local dev only, no deployment, no alerts. Failure modes seen while running
 `whaletale-edge`:
