@@ -26,6 +26,13 @@ def test_rtsp_forces_tcp_transport() -> None:
     assert "timeout" in options
 
 
+def test_http_stream_gets_a_socket_timeout() -> None:
+    url, fmt, options = source_spec("http://host/live.m3u8")
+    assert url == "http://host/live.m3u8"
+    assert fmt is None
+    assert options == {"timeout": "10000000"}
+
+
 def test_file_path_passes_through() -> None:
     url, fmt, options = source_spec("/data/clip.mp4")
     assert url == "/data/clip.mp4"

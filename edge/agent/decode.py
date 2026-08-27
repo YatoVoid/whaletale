@@ -27,11 +27,13 @@ def source_spec(source: str) -> tuple[str, str | None, dict[str, str]]:
     """Return (url, av_format, options). A bare integer means /dev/videoN."""
     if source.isdigit():
         return f"/dev/video{source}", "v4l2", {}
+    # `timeout` is the socket I/O timeout in microseconds; without it a dead
+    # network source hangs av.open forever (ffmpeg 7 renamed it from `stimeout`).
     if source.startswith("rtsp://"):
         # TCP transport is far more reliable than default UDP over real networks.
-        # `timeout` is the socket I/O timeout in microseconds (ffmpeg 7 renamed it
-        # from `stimeout`).
         return source, None, {"rtsp_transport": "tcp", "timeout": "10000000"}
+    if "://" in source:
+        return source, None, {"timeout": "10000000"}
     return source, None, {}
 
 
