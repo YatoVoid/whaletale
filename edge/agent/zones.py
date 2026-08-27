@@ -70,10 +70,17 @@ def parse_zone(spec: str | None, exit_margin: float = 0.02) -> Zone:
             [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)],
             exit_margin=exit_margin,
         )
-    parts = [float(v) for v in spec.split(",")]
+    try:
+        parts = [float(v) for v in spec.split(",")]
+    except ValueError:
+        raise ValueError("zone rectangle must be 'x1,y1,x2,y2' with numeric values") from None
     if len(parts) != 4:
         raise ValueError("zone rectangle must be 'x1,y1,x2,y2'")
     x1, y1, x2, y2 = parts
+    if not all(0.0 <= v <= 1.0 for v in parts):
+        raise ValueError("zone rectangle coordinates must be normalized to 0..1")
+    if x1 >= x2 or y1 >= y2:
+        raise ValueError("zone rectangle needs x1 < x2 and y1 < y2")
     return Zone(
         "rect",
         [(x1, y1), (x2, y1), (x2, y2), (x1, y2)],
