@@ -15,6 +15,19 @@ One entry per milestone from the project spec, Section 14.
   backoff while a file decode error stays fatal; zone-rectangle bounds checks;
   tests for decode decimation, reconnect give-up, and the new failure paths.
 
+### M2: Schema + attribution
+- Edge attribution: zone catchment (polygon dilated by `catchment_frac`),
+  passerby tracking (a track that reaches the catchment but never the zone
+  polygon), capture rate `entries / (entries + passersby)`, and person-seconds
+  (sum over people of time inside, distinct from occupied seconds), printed in
+  the run summary. Schema, local persistence, and cloud-side traffic share are
+  still open.
+- Edge rollup buckets: the run is split into fixed stream-time buckets
+  (`bucket_seconds`, default 900) with continuous track identity across
+  boundaries. Time metrics split at the boundary, event metrics land in the
+  bucket they resolve in. The summary prints a per-bucket table plus run
+  totals.
+
 <!--
 Later milestones (planned):
 M2 schema + attribution · M3 report · M4 edge agent · M5 cloud API + sync

@@ -7,11 +7,17 @@ from agent.zones import Zone
 
 INSIDE = (0.5, 0.5)
 BAND = (0.5, 0.63)  # outside polygon, inside the exit-margin buffer
-OUTSIDE = (0.5, 0.85)
+CATCHMENT = (0.5, 0.70)  # outside polygon and exit band, inside the catchment
+OUTSIDE = (0.5, 0.95)  # outside the catchment too
 
 
 def make_counter(min_dwell: float = 3.0) -> ZoneCounter:
-    z = Zone("sq", [(0.4, 0.4), (0.6, 0.4), (0.6, 0.6), (0.4, 0.6)], exit_margin=0.05)
+    z = Zone(
+        "sq",
+        [(0.4, 0.4), (0.6, 0.4), (0.6, 0.6), (0.4, 0.6)],
+        exit_margin=0.05,
+        catchment_margin=0.15,
+    )
     return ZoneCounter(z, min_dwell_seconds=min_dwell)
 
 
@@ -86,6 +92,83 @@ def test_two_people_one_zone_occupied_is_wall_clock_not_sum() -> None:
     assert c.stats.entries == 2
     # Both inside for the intervals [1,2] and [2,3]; wall-clock, not 4.0.
     assert c.stats.occupied_seconds == pytest.approx(2.0)
+    # Person-seconds sums over people: 2 people * 2 seconds.
+    assert c.stats.person_seconds == pytest.approx(4.0)
+
+
+def test_person_seconds_equals_occupied_for_a_lone_visitor() -> None:
+    c = make_counter(min_dwell=0.0)
+    for t in (0.0, 1.0, 2.0, 3.0):
+        c.update(t, {1: INSIDE})
+    c.finalize(3.0)
+    # One person: person-seconds and occupied seconds coincide. Intervals
+    # [1,2] and [2,3]; the track is still PENDING at t=0.
+    assert c.stats.occupied_seconds == pytest.approx(2.0)
+    assert c.stats.person_seconds == pytest.approx(2.0)
+
+
+def test_catchment_only_track_is_a_passerby() -> None:
+    # Spec 6.4: reaches the catchment, never the zone polygon.
+    c = make_counter()
+    for t in (0.0, 1.0, 2.0, 3.0):
+        c.update(t, {1: CATCHMENT})
+    c.finalize(4.0)
+    assert c.stats.entries == 0
+    assert c.stats.passersby == 1
+    assert c.stats.capture_rate == pytest.approx(0.0)
+
+
+def test_passerby_classified_on_end_track_too() -> None:
+    c = make_counter()
+    c.update(0.0, {1: CATCHMENT})
+    c.update(1.0, {1: CATCHMENT})
+    c.end_track(1, 2.0)
+    assert c.stats.passersby == 1
+    c.finalize(3.0)
+    assert c.stats.passersby == 1  # not double-counted
+
+
+def test_visitor_is_not_also_a_passerby() -> None:
+    c = make_counter()
+    c.update(0.0, {1: CATCHMENT})  # approaches through the catchment
+    for t in (1.0, 2.0, 3.0, 4.0, 5.0):
+        c.update(t, {1: INSIDE})
+    c.update(6.0, {1: OUTSIDE})
+    c.finalize(6.0)
+    assert c.stats.entries == 1
+    assert c.stats.passersby == 0
+    assert c.stats.capture_rate == pytest.approx(1.0)
+
+
+def test_brief_dip_into_zone_is_neither_entry_nor_passerby() -> None:
+    # Under min_dwell so not an entry, but the ground point did enter the
+    # polygon, so it is not a passerby either.
+    c = make_counter()
+    c.update(0.0, {1: CATCHMENT})
+    c.update(1.0, {1: INSIDE})
+    c.update(2.0, {1: OUTSIDE})
+    c.finalize(3.0)
+    assert c.stats.entries == 0
+    assert c.stats.passersby == 0
+
+
+def test_capture_rate_with_one_visitor_and_one_passerby() -> None:
+    c = make_counter()
+    for t in (0.0, 1.0, 2.0, 3.0, 4.0):
+        c.update(t, {1: INSIDE, 2: CATCHMENT})
+    c.finalize(5.0)
+    assert c.stats.entries == 1
+    assert c.stats.passersby == 1
+    assert c.stats.capture_rate == pytest.approx(0.5)
+
+
+def test_track_that_never_nears_the_zone_is_ignored() -> None:
+    c = make_counter()
+    for t in (0.0, 1.0, 2.0):
+        c.update(t, {1: OUTSIDE})
+    c.finalize(3.0)
+    assert c.stats.passersby == 0
+    assert c.stats.capture_rate == pytest.approx(0.0)
 
 
 def test_percentile() -> None:

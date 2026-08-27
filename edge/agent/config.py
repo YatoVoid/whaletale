@@ -36,6 +36,15 @@ class Config:
     # of the frame's smaller dimension. Keeps a person loitering on the boundary
     # from flickering entries.
     exit_margin_frac: float = 0.02
+    # Catchment (spec 6.4): the polygon dilated by this fraction. A track that
+    # reaches the catchment but never the zone is a passerby. Normalized-space
+    # stand-in for the spec's "2 m equivalent" until ground-plane calibration;
+    # tune per camera.
+    catchment_frac: float = 0.08
+    # Rollup bucket width in stream-time seconds (spec 6.5). 15 minutes is the
+    # usual foot-traffic granularity. A run shorter than one bucket produces a
+    # single bucket.
+    bucket_seconds: float = 900.0
 
     def __post_init__(self) -> None:
         if self.target_fps <= 0:
@@ -48,6 +57,10 @@ class Config:
             raise ConfigError(f"min_dwell_seconds must be >= 0, got {self.min_dwell_seconds}")
         if self.exit_margin_frac < 0:
             raise ConfigError(f"exit_margin_frac must be >= 0, got {self.exit_margin_frac}")
+        if self.catchment_frac < 0:
+            raise ConfigError(f"catchment_frac must be >= 0, got {self.catchment_frac}")
+        if self.bucket_seconds <= 0:
+            raise ConfigError(f"bucket_seconds must be > 0, got {self.bucket_seconds}")
 
     @staticmethod
     def from_env() -> Config:
@@ -60,4 +73,6 @@ class Config:
             score_threshold=_env_float("EDGE_SCORE_THRESHOLD", 0.5),
             min_dwell_seconds=_env_float("EDGE_MIN_DWELL_SECONDS", 3.0),
             exit_margin_frac=_env_float("EDGE_EXIT_MARGIN_FRAC", 0.02),
+            catchment_frac=_env_float("EDGE_CATCHMENT_FRAC", 0.08),
+            bucket_seconds=_env_float("EDGE_BUCKET_SECONDS", 900.0),
         )

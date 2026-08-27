@@ -40,9 +40,11 @@ uv run whaletale-edge --source rtsp://user:pass@camera/stream --fps 4
 uv run whaletale-edge --source 0            # /dev/video0
 ```
 
-The zone polygon for M1 is hard-coded in `edge/agent/zones.py` as normalized
-`[x, y]` points in `0..1`. The run prints per-zone entries, occupied seconds,
-and dwell p50/p90, plus the achievable decode+inference FPS.
+The zone polygon is hard-coded in `edge/agent/zones.py` as normalized `[x, y]`
+points in `0..1`. The run is split into fixed stream-time buckets
+(`EDGE_BUCKET_SECONDS`, default 900) and prints per-bucket and run-total
+entries, passersby, capture rate, occupied seconds, person-seconds, and dwell
+p50/p90, plus the achievable decode+inference FPS.
 
 Model weights download on first run to `EDGE_HF_CACHE` (default `edge/.hf_cache`)
 and are git-ignored.

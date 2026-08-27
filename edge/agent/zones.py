@@ -25,24 +25,35 @@ def ground_point(bbox_norm: tuple[float, float, float, float]) -> tuple[float, f
 
 
 class Zone:
-    """A named polygon with an enter test and a wider stay test (hysteresis)."""
+    """A named polygon with three containment tests:
+
+    - ``contains_enter``: inside the polygon itself (spec 6.4, entry).
+    - ``contains_stay``: inside the polygon dilated by ``exit_margin`` (spec 8.2
+      hysteresis, so a track loitering on the boundary doesn't flicker).
+    - ``contains_catchment``: inside the polygon dilated by ``catchment_margin``
+      (spec 6.4 passerby: a track that reaches the catchment but never the zone).
+
+    All buffering is in normalized space, a mild approximation (x and y aren't
+    the same pixel scale) that is good enough until ground-plane calibration.
+    """
 
     def __init__(
         self,
         name: str,
         polygon: list[tuple[float, float]],
         exit_margin: float = 0.02,
+        catchment_margin: float = 0.08,
     ) -> None:
         if len(polygon) < 3:
             raise ValueError(f"zone {name!r} needs >= 3 points, got {len(polygon)}")
+        if exit_margin < 0 or catchment_margin < 0:
+            raise ValueError(f"zone {name!r} margins must be >= 0")
         self.name = name
         self._poly = Polygon(polygon)
         if not self._poly.is_valid:
             raise ValueError(f"zone {name!r} polygon is self-intersecting")
-        # Dilated polygon for the "still inside" test. Buffering in normalized
-        # space is a mild approximation (x and y aren't the same pixel scale)
-        # but good enough for jitter suppression at M1.
         self._stay_poly = self._poly.buffer(exit_margin)
+        self._catchment_poly = self._poly.buffer(catchment_margin)
 
     def contains_enter(self, gp: tuple[float, float]) -> bool:
         return bool(self._poly.covers(Point(gp)))
@@ -50,12 +61,24 @@ class Zone:
     def contains_stay(self, gp: tuple[float, float]) -> bool:
         return bool(self._stay_poly.covers(Point(gp)))
 
+    def contains_catchment(self, gp: tuple[float, float]) -> bool:
+        return bool(self._catchment_poly.covers(Point(gp)))
 
-def default_zone(exit_margin: float = 0.02) -> Zone:
-    return Zone("zone-1", DEFAULT_ZONE_POLYGON, exit_margin=exit_margin)
+
+def default_zone(exit_margin: float = 0.02, catchment_margin: float = 0.08) -> Zone:
+    return Zone(
+        "zone-1",
+        DEFAULT_ZONE_POLYGON,
+        exit_margin=exit_margin,
+        catchment_margin=catchment_margin,
+    )
 
 
-def parse_zone(spec: str | None, exit_margin: float = 0.02) -> Zone:
+def parse_zone(
+    spec: str | None,
+    exit_margin: float = 0.02,
+    catchment_margin: float = 0.08,
+) -> Zone:
     """Build a zone from a CLI spec.
 
     - ``None`` -> the hand-coded default polygon
@@ -63,12 +86,13 @@ def parse_zone(spec: str | None, exit_margin: float = 0.02) -> Zone:
     - ``"x1,y1,x2,y2"`` -> an axis-aligned rectangle, normalized 0..1
     """
     if spec is None:
-        return default_zone(exit_margin)
+        return default_zone(exit_margin, catchment_margin)
     if spec == "full":
         return Zone(
             "full-frame",
             [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)],
             exit_margin=exit_margin,
+            catchment_margin=catchment_margin,
         )
     try:
         parts = [float(v) for v in spec.split(",")]
@@ -85,4 +109,5 @@ def parse_zone(spec: str | None, exit_margin: float = 0.02) -> Zone:
         "rect",
         [(x1, y1), (x2, y1), (x2, y2), (x1, y2)],
         exit_margin=exit_margin,
+        catchment_margin=catchment_margin,
     )
