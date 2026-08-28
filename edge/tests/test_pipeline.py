@@ -5,6 +5,7 @@ from pathlib import Path
 
 import av
 import numpy as np
+import pytest
 
 from agent.detect import BBoxNorm, Frame
 from agent.pipeline import MultiCameraPipeline
@@ -125,6 +126,12 @@ def test_two_cameras_write_observations_and_a_site_total(tmp_path: Path) -> None
     assert max(t["active_cameras"] for t in totals) == 2
     assert sum(t["total_people"] for t in totals) == sum(o["entries"] for o in obs)
     assert not pipeline.worker_errors
+
+    health = {h["id"]: h for h in store.camera_health()}
+    assert set(health) == {"cam-a", "cam-b"}
+    assert all(h["status"] == "online" for h in health.values())
+    assert all(h["mean_confidence"] == pytest.approx(0.95) for h in health.values())
+    assert all(h["fps_actual"] > 0 for h in health.values())
     store.close()
 
 

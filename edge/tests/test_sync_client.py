@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from agent.store import BucketStore, ObservationRecord, SiteTotalRecord
+from agent.store import BucketStore, CameraHealthRecord, ObservationRecord, SiteTotalRecord
 from sync.client import SyncClient
 
 B0 = datetime(2026, 6, 1, 12, 0, tzinfo=UTC)
@@ -118,3 +118,17 @@ def test_heartbeat_payload_shape(tmp_path: Path) -> None:
     assert payload["buckets_pending_sync"] == 4
     assert payload["per_camera"][0]["name"] == "cam-a"
     assert payload["disk_free_bytes"] >= 0
+
+
+def test_heartbeat_carries_camera_health_from_the_store(tmp_path: Path) -> None:
+    store = _seed_store(tmp_path / "e.db")
+    store.write_camera_health(CameraHealthRecord("cam-a", "online", 3.7, 0.88, B0))
+    poster = _Recorder(200)
+    client = SyncClient(store, "https://c.test", "site-1", "tok", poster=poster)
+
+    client.heartbeat(store.camera_health())
+    _url, payload, _tok = poster.calls[0]
+    cam = payload["per_camera"][0]
+    assert cam["id"] == "cam-a"
+    assert cam["status"] == "online"
+    assert cam["mean_confidence"] == 0.88

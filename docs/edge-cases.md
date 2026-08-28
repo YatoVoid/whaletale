@@ -17,7 +17,7 @@ a named refinement is not), **deferred** (not built, tracked below).
 | Resolution / aspect ratio change, normalized polygons survive, flag for review | partial | Polygons are normalized end to end (`zones.py`, `test_zones.test_parse_zone_variants`); the review flag is not emitted. |
 | Frozen frame (identical consecutive frames > 30s), treat as offline | done | `decode.FrozenFrameDetector`, wired into `_CameraWorker`; a stalled source sets a `frozen frame` worker error like a decode failure. `EDGE_FROZEN_FRAME_SECONDS` (default 30). `test_decode.test_frozen_frame_detector_*`, `test_pipeline.test_frozen_stream_surfaces_a_worker_error` |
 | RTSP credentials rotated, specific operator-facing message | partial | `DecodeError` surfaces the underlying error string (`test_decode.test_file_decode_failure_is_fatal`); it is not classified as an auth failure with dedicated copy. |
-| Night mode / IR switch, per-camera confidence baseline, flag `low_confidence` | partial | Cloud side is built and tested: `fleet._confidence_baseline`, `FleetConfig.confidence_drop`, `test_fleet.test_confidence_drop_from_baseline`. The edge does not yet stamp `low_confidence` on individual observation rows, and the agent does not populate per-camera `mean_confidence` in the heartbeat. |
+| Night mode / IR switch, per-camera confidence baseline, flag `low_confidence` | partial | End to end: the agent tracks a rolling per-camera mean detection confidence and fps, writes them to the local `camera_health` table (`pipeline._flush_camera_health`, `test_pipeline`), the sync client puts them in the heartbeat `per_camera` block, and the cloud derives the drop (`fleet._confidence_baseline`, `FleetConfig.confidence_drop`, `test_fleet.test_confidence_drop_from_baseline`). Not yet done: stamping `low_confidence` on individual observation rows. |
 | Direct sun / blown highlights, same mechanism | partial | Same as above. |
 
 ## 8.2 Detection and tracking
@@ -79,10 +79,10 @@ gap.
    hash it, and when the hash diverges past a threshold flag the camera
    `needs_recalibration` and stop counting. The reference frame and hash never
    leave the box.
-2. **Per-camera confidence on the edge (§8.1).** The agent should track a
-   rolling mean detection confidence per camera, put it in the heartbeat
-   `per_camera` block, and stamp `low_confidence` on observation rows when it
-   drops sharply. The cloud already consumes this signal once it arrives.
+2. **`low_confidence` on observation rows (§8.1).** The per-camera confidence
+   signal now reaches the cloud fleet view; the remaining piece is stamping a
+   `low_confidence` flag on the individual `observations` rows a camera
+   produced while its confidence was depressed, so a report can grey them out.
 3. **Excluded zones and staff-hours filter (§8.2).** An `excluded` space kind
    that the counter subtracts, plus a reporting toggle that drops configured
    staff-hour windows.

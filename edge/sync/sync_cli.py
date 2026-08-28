@@ -73,7 +73,7 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 print(f"push failed: {r.error} (will retry)", file=sys.stderr, flush=True)
             if not args.no_heartbeat:
-                hb = client.heartbeat()
+                hb = client.heartbeat(store.camera_health())
                 if not hb.ok:
                     print(f"heartbeat failed: {hb.error}", file=sys.stderr, flush=True)
             if args.once:

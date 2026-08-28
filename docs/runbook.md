@@ -132,6 +132,7 @@ disk < 20%, mean confidence down > 30% from baseline, agent version behind → *
 |---|---|---|
 | `/admin/fleet` → 401 | `WHALETALE_ADMIN_TOKEN` unset or the bearer doesn't match | Set the env var on the API host; it's staff-only. |
 | A `disk_low` alert never fires on a real box | old agent that doesn't send `disk_total_bytes` | Upgrade the agent (M8 edge change). Free-bytes alone can't give a ratio. |
+| `per_camera` confidence stays empty in the fleet view | `whaletale-agent` and `whaletale-sync` are pointed at different `EDGE_SQLITE_PATH` values | They must share the file: the agent writes `camera_health`, the sync process reads it into the heartbeat. |
 | Alerts don't clear after the box recovers | `POST /admin/fleet/evaluate` hasn't run since | Schedule it (every few minutes). It resolves rows whose condition is gone. |
 | `low_confidence` noisy at dawn/dusk | IR switch / low sun; the baseline hasn't caught up | Expected transient. Persistent means a moved or failing camera (spec 8.1). |
 

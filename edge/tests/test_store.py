@@ -7,6 +7,7 @@ import pytest
 
 from agent.store import (
     BucketStore,
+    CameraHealthRecord,
     IntegrityError,
     ObservationRecord,
     SiteTotalRecord,
@@ -66,6 +67,23 @@ def test_site_totals_round_trip(tmp_path: Path) -> None:
         rows = s.unsynced_site_totals()
         assert rows[0]["total_people"] == 240
         assert s.pending_count() == 1
+
+
+def test_camera_health_upserts_and_reads_back(tmp_path: Path) -> None:
+    with BucketStore(tmp_path / "edge.db") as s:
+        s.write_camera_health(CameraHealthRecord("cam-a", "online", 3.8, 0.91, B0))
+        s.write_camera_health(CameraHealthRecord("cam-b", "offline", 0.0, None, None))
+        rows = {r["id"]: r for r in s.camera_health()}
+        assert rows["cam-a"]["status"] == "online"
+        assert rows["cam-a"]["mean_confidence"] == pytest.approx(0.91)
+        assert rows["cam-a"]["last_frame_at"] == B0.isoformat()
+        assert rows["cam-b"]["status"] == "offline"
+        assert rows["cam-b"]["last_frame_at"] is None
+
+        s.write_camera_health(CameraHealthRecord("cam-a", "frozen", 0.0, None, B0))
+        again = {r["id"]: r for r in s.camera_health()}
+        assert again["cam-a"]["status"] == "frozen"  # overwritten in place, not duplicated
+        assert len(again) == 2
 
 
 def test_prune_keeps_unsynced_and_recent_synced(tmp_path: Path) -> None:

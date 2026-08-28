@@ -26,6 +26,11 @@ One entry per milestone from the project spec, Section 14.
 - Cloud: `security_event()` writes one structured line to the `whaletale.security`
   logger for every auth failure, permission denial, rate-limit hit, and admin
   action, so they can be shipped somewhere queryable.
+- Edge: per-camera health telemetry (spec 8.1 / 9). The agent tracks a rolling
+  mean detection confidence, actual fps, last-frame time, and online/offline/
+  frozen status per camera, writes them to a local `camera_health` table, and
+  the sync client ships them in the heartbeat `per_camera` block. The cloud
+  fleet view already derives the confidence-drop alert from this.
 - Edge: frozen-stream detection (spec 8.1). `decode.FrozenFrameDetector` flags a
   source that keeps delivering byte-identical frames for longer than
   `EDGE_FROZEN_FRAME_SECONDS` (default 30); the camera worker then reports a
