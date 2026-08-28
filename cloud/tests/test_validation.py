@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from datetime import time, timedelta
+from datetime import UTC, datetime, time, timedelta
+from uuid import uuid4
 
 import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from schemas.enums import TenancyKind
+from schemas.enums import SpaceKind, TenancyKind
 from whaletale_cloud import models as m
 from whaletale_cloud.seed import SeedResult
 from whaletale_cloud.validation import (
@@ -14,7 +15,68 @@ from whaletale_cloud.validation import (
     ProposedTenancy,
     assert_saveable_polygon,
     find_tenancy_conflicts,
+    find_zone_overlaps,
 )
+
+_SQUARE = [[0.1, 0.1], [0.9, 0.1], [0.9, 0.9], [0.1, 0.9]]
+_FAR = [[0.0, 0.0], [0.05, 0.0], [0.05, 0.05], [0.0, 0.05]]
+
+
+def _zone_fixture(db: Session) -> tuple[m.Site, list[m.Camera], dict[str, m.Space]]:
+    site = m.Site(id=uuid4(), name="S", timezone="America/Chicago")
+    db.add(site)
+    db.flush()
+    cams = [
+        m.Camera(id=uuid4(), site_id=site.id, name=n, resolution="1920x1080", fps_target=4.0)
+        for n in ("a", "b")
+    ]
+    spaces = {
+        n: m.Space(id=uuid4(), site_id=site.id, name=n, kind=SpaceKind.STALL)
+        for n in ("patio", "table", "other-cam")
+    }
+    db.add_all([*cams, *spaces.values()])
+    db.flush()
+    now = datetime.now(UTC)
+    db.add_all(
+        [
+            m.ZoneVersion(
+                space_id=spaces["patio"].id,
+                camera_id=cams[0].id,
+                polygon=_SQUARE,
+                is_primary=True,
+                effective_from=now,
+                created_by="t",
+            ),
+            m.ZoneVersion(
+                space_id=spaces["other-cam"].id,
+                camera_id=cams[1].id,
+                polygon=_SQUARE,
+                is_primary=True,
+                effective_from=now,
+                created_by="t",
+            ),
+        ]
+    )
+    db.flush()
+    return site, cams, spaces
+
+
+def test_zone_overlap_detected_on_same_camera(db: Session) -> None:
+    _site, cams, spaces = _zone_fixture(db)
+    hits = find_zone_overlaps(db, cams[0].id, spaces["table"].id, _SQUARE)
+    assert [h.space_id for h in hits] == [spaces["patio"].id]
+    assert hits[0].iou == pytest.approx(1.0)
+
+
+def test_zone_overlap_ignores_other_cameras_and_self(db: Session) -> None:
+    _site, cams, spaces = _zone_fixture(db)
+    # identical polygon, but the only overlapping zone is on camera b
+    assert find_zone_overlaps(db, cams[0].id, spaces["patio"].id, _SQUARE) == []
+
+
+def test_zone_overlap_below_min_iou_is_not_reported(db: Session) -> None:
+    _site, cams, spaces = _zone_fixture(db)
+    assert find_zone_overlaps(db, cams[0].id, spaces["table"].id, _FAR) == []
 
 
 def test_polygon_needs_three_points() -> None:

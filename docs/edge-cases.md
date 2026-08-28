@@ -39,7 +39,7 @@ a named refinement is not), **deferred** (not built, tracked below).
 | Zone with < 3 points, reject at the UI | done | `validation.assert_saveable_polygon`, web zone editor guard; `test_validation.test_polygon_needs_three_points`, `test_zones.test_zone_rejects_fewer_than_three_points` |
 | Self-intersecting polygon, refuse to save | done | `test_validation.test_self_intersecting_polygon_is_rejected`, `test_zones.test_zone_rejects_self_intersecting_polygon`, `test_operator_api.test_reshape_rejects_a_self_intersecting_polygon` |
 | Zone entirely outside frame bounds, reject | done | `test_validation.test_polygon_must_be_inside_the_frame`, `test_siteconfig.test_invalid_configs_are_rejected` |
-| Two zones overlapping on one camera, allowed but warn and confirm parent/child | partial | Overlap is allowed (`Space.parent_space_id` exists); the warn-and-confirm step is not built. |
+| Two zones overlapping on one camera, allowed but warn and confirm parent/child | done | `validation.find_zone_overlaps` (IoU against every other open primary on the camera); `reshape_zone` returns a 409 `zone_overlap` with the overlapping spaces unless they are already in a parent/child relation with the edited space or `acknowledge_overlap` is set. The console zone editor shows the warning and a "Save with the overlap" button. `test_validation.test_zone_overlap_*`, `test_operator_api.test_reshape_warns_on_zone_overlap_then_saves_when_acknowledged` |
 | Space with no tenancy for a period, report as vacant | done | `attribution.py`; `test_attribution.test_never_leased_space_is_all_vacant`, `test_tenancy_gap_reads_as_vacant_between_two_occupants` |
 | Overlapping tenancies on one space, reject on save, show the conflict | done | `validation.find_tenancy_conflicts`; `test_validation.test_overlapping_permanent_tenancy_is_a_conflict`, `test_same_weekday_overlapping_daily_windows_conflict`, `test_operator_api.test_create_tenancy_then_conflict` |
 | Tenancy edited retroactively, recompute affected periods | done | Attribution joins at query time; `test_attribution.test_retroactive_tenancy_edit_recomputes` |
@@ -90,9 +90,6 @@ gap.
    holes inside a zone polygon that do not count.
 5. **Operating hours per site (§8.2).** Store open/close per weekday and skip
    bucket emission outside them rather than relying on "no activity, no bucket".
-6. **Parent/child confirmation for overlapping zones (§8.3).** When two zones on
-   one camera overlap, warn and require the operator to set the parent/child
-   relation before saving.
 
 ## Known limitations
 

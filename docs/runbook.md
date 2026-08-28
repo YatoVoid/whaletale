@@ -178,6 +178,7 @@ deferred, with the test that pins each). New this milestone:
 |---|---|---|
 | Entry counts look low after tuning | `EDGE_REENTRY_DISTANCE` too large in a busy crossing scene, so distinct people get merged | Lower it; check `reentries_merged` against expected occlusion frequency. |
 | Zone save fails with 409 "changed since you opened it" | another operator reshaped the same zone | Reload the editor (it refetches the current version) and reapply. |
+| Zone save shows "overlaps another zone on the same camera" | the polygon overlaps another space's zone by IoU >= 0.02 | Intended when a table sits inside a patio: set the parent/child relation on the space, or use "Save with the overlap". |
 | A partial/deferred §8 item bites in the pilot | see `docs/edge-cases.md` "Deferred, tracked" | Each has a concrete build note; none block the pilot. |
 | An edge box or operator gets 429 on a valid token | 10 failed auth attempts from that IP in the last 15 min tripped the lockout | Wait out the window, or restart the API process to clear in-process state. Check `whaletale.security` for the failing attempts. |
 

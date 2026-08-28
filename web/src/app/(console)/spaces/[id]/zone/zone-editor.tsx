@@ -112,10 +112,10 @@ export function ZoneEditor({
     return () => window.removeEventListener("keydown", onKey);
   }, [undo, redo]);
 
-  async function save() {
+  async function save(acknowledgeOverlap = false) {
     setSaving(true);
     setResult(null);
-    const r = await saveZone(spaceId, pts, createdBy, baseVersionId);
+    const r = await saveZone(spaceId, pts, createdBy, baseVersionId, acknowledgeOverlap);
     setSaving(false);
     setResult(r);
     if (r.ok) setTimeout(() => router.push(`/spaces/${spaceId}`), 1400);
@@ -228,7 +228,7 @@ export function ZoneEditor({
 
       <div className="mt-5 flex items-center gap-3">
         <button
-          onClick={save}
+          onClick={() => save()}
           disabled={saving || !dirty || pts.length < 3}
           className="wt-hairline border px-4 py-1.5 text-sm text-ink hover:bg-[color-mix(in_srgb,var(--color-field)_8%,transparent)] disabled:opacity-50"
         >
@@ -245,7 +245,23 @@ export function ZoneEditor({
         ) : null}
       </div>
 
-      {result && !result.ok ? (
+      {result && !result.ok && "overlap" in result ? (
+        <div role="alert" className="wt-hairline mt-4 border-l-2 border-flag pl-3 text-sm">
+          <p className="text-ink">{result.message}</p>
+          <p className="mt-1 text-ink-soft">
+            Overlaps:{" "}
+            {result.overlap.map((o) => o.space_name).join(", ")}. If one space sits
+            inside the other, set the parent/child relation on the space first.
+          </p>
+          <button
+            onClick={() => save(true)}
+            disabled={saving}
+            className="wt-hairline mt-2 border px-3 py-1 text-ink-soft hover:text-ink disabled:opacity-50"
+          >
+            Save with the overlap
+          </button>
+        </div>
+      ) : result && !result.ok ? (
         <p role="alert" className="mt-4 text-sm text-flag">
           {result.error}
         </p>

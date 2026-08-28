@@ -26,6 +26,12 @@ One entry per milestone from the project spec, Section 14.
 - Cloud: `security_event()` writes one structured line to the `whaletale.security`
   logger for every auth failure, permission denial, rate-limit hit, and admin
   action, so they can be shipped somewhere queryable.
+- Cloud + web: overlapping-zone confirmation (spec 8.3). `find_zone_overlaps`
+  checks a proposed polygon against every other open primary zone on the same
+  camera; `reshape_zone` returns 409 `zone_overlap` listing the spaces unless
+  they are in a parent/child relation with the edited space or the caller sets
+  `acknowledge_overlap`. `ApiError` now carries the parsed `detail`; the zone
+  editor renders the warning and a "Save with the overlap" action.
 - Edge: per-camera health telemetry (spec 8.1 / 9). The agent tracks a rolling
   mean detection confidence, actual fps, last-frame time, and online/offline/
   frozen status per camera, writes them to a local `camera_health` table, and

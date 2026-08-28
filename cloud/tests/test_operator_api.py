@@ -148,6 +148,7 @@ def test_reshape_zone_creates_a_new_version(op: dict[str, Any]) -> None:
     body = {
         "polygon": [[0.2, 0.3], [0.8, 0.3], [0.8, 0.9], [0.2, 0.9]],
         "created_by": "mgr@example.test",
+        "acknowledge_overlap": True,  # seed zones share cameras; not what this test covers
     }
     r = _post(op, f"/v1/spaces/{space_id}/zone-versions/reshape", body)
     assert r.status_code == 201, r.text
@@ -180,17 +181,51 @@ def test_reshape_conflicts_when_base_version_is_stale(op: dict[str, Any]) -> Non
     first = _post(
         op,
         f"/v1/spaces/{space_id}/zone-versions/reshape",
-        {"polygon": poly, "created_by": "a@example.test", "base_version_id": stale},
+        {
+            "polygon": poly,
+            "created_by": "a@example.test",
+            "base_version_id": stale,
+            "acknowledge_overlap": True,
+        },
     )
     assert first.status_code == 201, first.text
 
     second = _post(
         op,
         f"/v1/spaces/{space_id}/zone-versions/reshape",
-        {"polygon": poly, "created_by": "b@example.test", "base_version_id": stale},
+        {
+            "polygon": poly,
+            "created_by": "b@example.test",
+            "base_version_id": stale,
+            "acknowledge_overlap": True,
+        },
     )
     assert second.status_code == 409
     assert "changed since you opened it" in second.json()["detail"]
+
+
+def test_reshape_warns_on_zone_overlap_then_saves_when_acknowledged(op: dict[str, Any]) -> None:
+    # spec 8.3: several seed zones share a camera. A near-full-frame polygon
+    # on stall-1 covers some of them.
+    space_id = op["res"].space_ids["stall-1"]
+    big = [[0.05, 0.05], [0.95, 0.05], [0.95, 0.95], [0.05, 0.95]]
+
+    r = _post(
+        op,
+        f"/v1/spaces/{space_id}/zone-versions/reshape",
+        {"polygon": big, "created_by": "mgr@example.test"},
+    )
+    assert r.status_code == 409, r.text
+    detail = r.json()["detail"]
+    assert detail["error"] == "zone_overlap"
+    assert len(detail["overlapping_spaces"]) >= 1
+
+    r2 = _post(
+        op,
+        f"/v1/spaces/{space_id}/zone-versions/reshape",
+        {"polygon": big, "created_by": "mgr@example.test", "acknowledge_overlap": True},
+    )
+    assert r2.status_code == 201, r2.text
 
 
 def test_reshape_rejects_a_self_intersecting_polygon(op: dict[str, Any]) -> None:

@@ -140,6 +140,9 @@ class ReshapeIn(BaseModel):
     # If another operator has since reshaped, this no longer matches and the
     # save is refused with a conflict instead of silently stacking versions.
     base_version_id: UUID | None = None
+    # spec 8.3: overlapping another zone on the same camera is allowed but must
+    # be confirmed. Set once the operator has seen the warning.
+    acknowledge_overlap: bool = False
 
 
 class CurrentZoneOut(BaseModel):
