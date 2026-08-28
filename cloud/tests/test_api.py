@@ -88,6 +88,24 @@ def test_ingest_upserts_and_is_idempotent(api_client: Any, paired: dict[str, Any
         assert s.scalar(select(func.count()).select_from(m.SiteTotal)) == 1
 
 
+def test_bucket_timestamp_is_stored_verbatim_never_restamped(
+    api_client: Any, paired: dict[str, Any]
+) -> None:
+    # spec 8.4: bucket timestamps are authored on the edge in UTC; the cloud
+    # stores them as sent and never substitutes its own clock.
+    edge_ts = datetime(2026, 3, 9, 7, 45, tzinfo=UTC)  # a US DST-transition morning
+    body = {
+        "schema_version": 1,
+        "site_id": paired["site_id"],
+        "observations": [_obs(paired["zv_id"], start=edge_ts, entries=4)],
+    }
+    assert _ingest(api_client, paired["token"], body).status_code == 200
+    with api_client.db() as s:
+        stored = s.scalar(select(m.Observation.bucket_start))
+        assert stored is not None
+        assert stored.astimezone(UTC) == edge_ts
+
+
 def test_missing_token_is_401(api_client: Any) -> None:
     r = api_client.post("/v1/ingest", json={"site_id": "x", "observations": []})
     assert r.status_code == 401

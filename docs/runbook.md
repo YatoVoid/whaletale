@@ -150,6 +150,29 @@ Stripe subscription per site, quantity = the number of `cameras` rows
 | Webhook returns 400 | bad `Stripe-Signature` or `STRIPE_WEBHOOK_SECRET` unset | Check the signing secret matches the endpoint's in the Stripe dashboard. |
 | A canceled site still shows data | export window (`WHALETALE_BILLING_EXPORT_DAYS`) | Data is retained until `export_ready_at` passes, then a separate job deletes it. |
 
+## M10: hardening
+
+`docs/edge-cases.md` is the full spec §8 coverage matrix (done / partial /
+deferred, with the test that pins each). New this milestone:
+
+- **Re-entry grace window (spec 8.2).** An occluded person reappears under a
+  fresh track id. The counter parks a dropped track for `EDGE_REENTRY_SECONDS`
+  and lets a new track starting within `EDGE_REENTRY_DISTANCE` inherit its
+  visit instead of counting a second entry. `ZoneStats.reentries_merged` counts
+  how often this fired. Set either env var to 0 to disable.
+- **Optimistic locking on zone reshape (spec 8.4).** The editor loads
+  `GET /v1/spaces/{id}/zone-versions/current` and sends its `zone_version_id`
+  back as `base_version_id`. If another operator reshaped in between, the save
+  is refused with 409 "this zone changed since you opened it".
+- **API security headers.** Every response carries HSTS, `X-Content-Type-Options`,
+  `X-Frame-Options: DENY`, `Referrer-Policy`, and a locked-down CSP.
+
+| Symptom | Cause | Action |
+|---|---|---|
+| Entry counts look low after tuning | `EDGE_REENTRY_DISTANCE` too large in a busy crossing scene, so distinct people get merged | Lower it; check `reentries_merged` against expected occlusion frequency. |
+| Zone save fails with 409 "changed since you opened it" | another operator reshaped the same zone | Reload the editor (it refetches the current version) and reapply. |
+| A partial/deferred §8 item bites in the pilot | see `docs/edge-cases.md` "Deferred, tracked" | Each has a concrete build note; none block the pilot. |
+
 ## Later milestones
 
-Filled in as each merges. Cloud/site alerting starts at M8.
+Cloud/site alerting starts at M8. M10 is the final spec milestone.
