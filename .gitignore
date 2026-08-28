@@ -72,3 +72,4 @@ captures/
 .idea/
 .vscode/
 *.swp
+shared/uv.lock
