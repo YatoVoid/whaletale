@@ -15,6 +15,20 @@ One entry per milestone from the project spec, Section 14.
   backoff while a file decode error stays fatal; zone-rectangle bounds checks;
   tests for decode decimation, reconnect give-up, and the new failure paths.
 
+### M5: Cloud API + sync
+- `shared/schemas/wire.py`: the edge <-> cloud sync contract (`IngestRequest`,
+  `HeartbeatRequest`, ...), separate from the persisted-row models so a payload
+  version can lag the DB schema (spec 5.3). Dropped `bucket_end` from
+  `site_totals` to match Section 5.1.
+- FastAPI ingest API (`whaletale_cloud/api/`, `whaletale-api`): `POST /v1/ingest`
+  idempotent upsert of observations and site totals onto the M2 schema (spec
+  8.4), `POST /v1/heartbeat` storing Section 9 telemetry in new `edge_boxes` /
+  `heartbeats` tables (Alembic migration).
+- Pairing-token auth (SHA-256 at rest), payload `site_id` must match the token's
+  site, `zone_version_id`s must belong to that site, 8 MB body cap, per-token
+  rate limit, auth-failure logging. No CORS (machine-to-machine), no docs route.
+- Contract tests pin the exact edge payload shape against the wire schema.
+
 ### M4: Edge agent
 - Bucket stats reconciled to the Section 5.1 `observations` columns: `exits`
   (clean boundary crossings), `peak_occupancy` (max concurrent in the bucket),

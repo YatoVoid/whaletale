@@ -58,6 +58,21 @@ central alerting - that is M8.
 | Buckets look an hour off around a DST change | edge authors `bucket_start` in UTC; nothing re-stamps it | Correct by design (spec 8.4). If it is genuinely wrong, check the box's NTP sync. |
 | `active_cameras` lower than the camera count for some buckets | a camera dropped frames for part of that 15-minute window | Expected; the bucket is not extrapolated (spec 8.1). Persistent low counts mean a flaky camera. |
 
+## M5: cloud API + sync
+
+`whaletale-api` (FastAPI) exposes `POST /v1/ingest` and `POST /v1/heartbeat` for
+the edge boxes. Auth is a per-box pairing token (`Authorization: Bearer`), stored
+only as a SHA-256. Still no central alerting on the telemetry - that is M8.
+
+| Symptom | Cause | Action |
+|---|---|---|
+| Edge `whaletale-sync` logs `HTTP 401` | token unknown or revoked | Re-pair the box: create a new `edge_boxes` row (M7 does this in the console; for now `pair_edge_box()` in a shell), put the new token in `/etc/whaletale/site.json`. |
+| Edge logs `HTTP 403` | the payload's `site_id` does not match the token's site | The box config points at the wrong site. Fix `site_id` in `site.json`. |
+| Edge logs `HTTP 422` on ingest | an observation references a `zone_version_id` not at this site | Stale zone config on the box, or the zone was reshaped. Re-fetch the zone config (M7); the buckets stay buffered and retry. |
+| Edge logs `HTTP 409` | the box's payload schema is newer than the API | Deploy the newer cloud. The box keeps buffering. |
+| `HTTP 429` from ingest | one box is pushing faster than the per-token limit (120/min) | Normal backpressure; the client retries. A persistent 429 means a misbehaving box - check its loop interval. |
+| Ingest returns 200 but rows do not appear | the request hit a different API instance / DB | Confirm `DATABASE_URL`. Ingest is idempotent, so a resend is safe. |
+
 ## Later milestones
 
 Filled in as each merges. Cloud/site alerting starts at M8.

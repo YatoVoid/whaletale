@@ -46,8 +46,7 @@ CREATE TABLE IF NOT EXISTS observations (
 
 CREATE TABLE IF NOT EXISTS site_totals (
     site_id        TEXT NOT NULL,
-    bucket_start   TEXT NOT NULL,
-    bucket_end     TEXT NOT NULL,
+    bucket_start   TEXT NOT NULL,   -- spec 5.1: 15-minute bucket, end implied
     total_people   INTEGER NOT NULL,
     active_cameras INTEGER NOT NULL,
     synced_at      TEXT,
@@ -80,7 +79,6 @@ class ObservationRecord:
 class SiteTotalRecord:
     site_id: str
     bucket_start: datetime
-    bucket_end: datetime
     total_people: int
     active_cameras: int
 
@@ -163,10 +161,9 @@ class BucketStore:
         self._db.execute(
             """
             INSERT INTO site_totals (
-                site_id, bucket_start, bucket_end, total_people, active_cameras, synced_at
-            ) VALUES (?,?,?,?,?, NULL)
+                site_id, bucket_start, total_people, active_cameras, synced_at
+            ) VALUES (?,?,?,?, NULL)
             ON CONFLICT(site_id, bucket_start) DO UPDATE SET
-                bucket_end=excluded.bucket_end,
                 total_people=excluded.total_people,
                 active_cameras=excluded.active_cameras,
                 synced_at=NULL
@@ -174,7 +171,6 @@ class BucketStore:
             (
                 rec.site_id,
                 _iso(rec.bucket_start),
-                _iso(rec.bucket_end),
                 rec.total_people,
                 rec.active_cameras,
             ),

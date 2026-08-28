@@ -19,6 +19,7 @@ from enum import StrEnum
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
+    BigInteger,
     CheckConstraint,
     DateTime,
     Enum,
@@ -256,3 +257,40 @@ class DayAnnotation(Base):
     label: Mapped[str] = mapped_column(String(300))
     exclude_from_baseline: Mapped[bool] = mapped_column(default=False)
     created_by: Mapped[str] = mapped_column(String(200))
+
+
+class EdgeBox(Base):
+    """A paired on-prem agent (spec 8.4: a replaced box re-pairs with a token).
+    Not in Section 5.1 - added with M5."""
+
+    __tablename__ = "edge_boxes"
+
+    id: Mapped[UUID] = _pk()
+    site_id: Mapped[UUID] = mapped_column(ForeignKey("sites.id", ondelete="RESTRICT"))
+    name: Mapped[str | None] = mapped_column(String(200))
+    token_hash: Mapped[str] = mapped_column(String(64))  # sha256 hex of the bearer token
+    agent_version: Mapped[str | None] = mapped_column(String(64))
+    last_seen_at: Mapped[datetime | None] = _utc()
+    created_at: Mapped[datetime] = _utc(server_default=text("now()"))
+    revoked_at: Mapped[datetime | None] = _utc()
+
+    __table_args__ = (UniqueConstraint("token_hash", name="token_hash"),)
+
+
+class Heartbeat(Base):
+    """Fleet telemetry (spec 9). Stored raw; alerting on it is M8."""
+
+    __tablename__ = "heartbeats"
+
+    id: Mapped[UUID] = _pk()
+    edge_box_id: Mapped[UUID] = mapped_column(ForeignKey("edge_boxes.id", ondelete="CASCADE"))
+    site_id: Mapped[UUID] = mapped_column(ForeignKey("sites.id", ondelete="RESTRICT"))
+    received_at: Mapped[datetime] = _utc(server_default=text("now()"))
+    agent_version: Mapped[str] = mapped_column(String(64))
+    uptime_seconds: Mapped[float] = mapped_column()
+    cpu_percent: Mapped[float | None] = mapped_column()
+    mem_percent: Mapped[float | None] = mapped_column()
+    disk_free_bytes: Mapped[int] = mapped_column(BigInteger)
+    buckets_pending_sync: Mapped[int] = mapped_column()
+    last_sync_at: Mapped[datetime | None] = _utc()
+    per_camera: Mapped[list[dict[str, object]]] = mapped_column(JSONB)

@@ -40,7 +40,7 @@ _OBS_KEYS = (
     "passersby",
     "capture_events",
 )
-_SITE_KEYS = ("site_id", "bucket_start", "bucket_end", "total_people", "active_cameras")
+_SITE_KEYS = ("site_id", "bucket_start", "total_people", "active_cameras")
 
 
 @dataclass

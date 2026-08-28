@@ -102,12 +102,50 @@ def isolated_engine(pg_url: str) -> Iterator[Engine]:
 
 @pytest.fixture
 def clean_db(isolated_engine: Engine) -> Iterator[Session]:
-    with isolated_engine.begin() as conn:
-        tables = ", ".join(f'"{t.name}"' for t in reversed(Base.metadata.sorted_tables))
-        conn.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))
+    _truncate(isolated_engine)
     session = Session(isolated_engine, expire_on_commit=False)
     try:
         yield session
         session.commit()
     finally:
         session.close()
+
+
+def _truncate(engine: Engine) -> None:
+    with engine.begin() as conn:
+        tables = ", ".join(f'"{t.name}"' for t in reversed(Base.metadata.sorted_tables))
+        conn.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))
+
+
+@pytest.fixture
+def api_client(isolated_engine: Engine) -> Iterator[object]:
+    """A FastAPI TestClient whose session and rate limiter are bound to the
+    isolated database. Truncates first; commits are real (ingest idempotency
+    needs them)."""
+    from fastapi.testclient import TestClient
+    from sqlalchemy.orm import sessionmaker
+
+    from whaletale_cloud.api.app import create_app
+    from whaletale_cloud.api.deps import get_session
+    from whaletale_cloud.api.security import RateLimiter
+
+    _truncate(isolated_engine)
+    maker = sessionmaker(isolated_engine, expire_on_commit=False)
+
+    def _session_override() -> Iterator[Session]:
+        s = maker()
+        try:
+            yield s
+            s.commit()
+        except Exception:
+            s.rollback()
+            raise
+        finally:
+            s.close()
+
+    app = create_app()
+    app.state.rate_limiter = RateLimiter()
+    app.dependency_overrides[get_session] = _session_override
+    with TestClient(app) as client:
+        client.db = maker
+        yield client

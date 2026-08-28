@@ -62,7 +62,7 @@ def test_upsert_overwrites_and_rearms_for_sync(tmp_path: Path) -> None:
 
 def test_site_totals_round_trip(tmp_path: Path) -> None:
     with BucketStore(tmp_path / "edge.db") as s:
-        s.write_site_total(SiteTotalRecord("site-1", B0, B0 + timedelta(minutes=15), 240, 3))
+        s.write_site_total(SiteTotalRecord("site-1", B0, 240, 3))
         rows = s.unsynced_site_totals()
         assert rows[0]["total_people"] == 240
         assert s.pending_count() == 1
