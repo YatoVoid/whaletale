@@ -26,6 +26,10 @@ One entry per milestone from the project spec, Section 14.
 - Cloud: `security_event()` writes one structured line to the `whaletale.security`
   logger for every auth failure, permission denial, rate-limit hit, and admin
   action, so they can be shipped somewhere queryable.
+- Edge: excluded zones (spec 8.2). A zone with `"excluded": true` in the site
+  config becomes a staff-only mask; any detection whose ground point falls
+  inside it is dropped before any counting zone sees it, so repeated staff
+  crossings stop inflating entries. `site.example.json` shows the format.
 - Edge + cloud: camera-drift detection (spec 8.1). `calibration.py` hashes the
   live view (dHash) against an on-box reference; a fixed camera that gets bumped
   or re-aimed diverges past `EDGE_DRIFT_HAMMING_THRESHOLD` bits over
