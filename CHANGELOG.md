@@ -52,6 +52,16 @@ One entry per milestone from the project spec, Section 14.
 - Save-time checks (8.3): self-intersecting / out-of-frame polygons, and
   tenancy conflicts (date and daily-window overlap).
 
+### M3: Report
+- The Section 11 one-pager for a space over a period, HTML and PDF (WeasyPrint,
+  Jinja2), with server-rendered SVG charts. `whaletale-report` generates it from
+  the seeded demo site.
+- Report data (`report.py`): headline metrics + peer rank, hourly and daily
+  entry pattern, per-day occupancy timeline (missing days read as vacant), and a
+  per-day anomaly table joined to `day_annotations` (spec 6.5).
+- `license_audit.py` now clears a disjunctively-licensed dependency (GPL arm
+  beside an LGPL or permissive arm), for `pyphen` via WeasyPrint.
+
 <!--
 Later milestones (planned):
 M2 schema + attribution · M3 report · M4 edge agent · M5 cloud API + sync
