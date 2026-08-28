@@ -294,3 +294,35 @@ class Heartbeat(Base):
     buckets_pending_sync: Mapped[int] = mapped_column()
     last_sync_at: Mapped[datetime | None] = _utc()
     per_camera: Mapped[list[dict[str, object]]] = mapped_column(JSONB)
+
+
+class OperatorUser(Base):
+    """A console user. Real login is Auth.js (spec 12); until the frontend wires
+    that in, the API trusts a hashed bearer token. `site_ids` scopes every query
+    to this user's sites (improve-vibe-code: row-level tenant checks). Added with
+    M6."""
+
+    __tablename__ = "operator_users"
+
+    id: Mapped[UUID] = _pk()
+    email: Mapped[str] = mapped_column(String(320))
+    name: Mapped[str | None] = mapped_column(String(200))
+    token_hash: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = _utc(server_default=text("now()"))
+    disabled_at: Mapped[datetime | None] = _utc()
+
+    __table_args__ = (
+        UniqueConstraint("email"),
+        UniqueConstraint("token_hash"),
+    )
+
+
+class OperatorUserSite(Base):
+    __tablename__ = "operator_user_sites"
+
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("operator_users.id", ondelete="CASCADE"), primary_key=True
+    )
+    site_id: Mapped[UUID] = mapped_column(
+        ForeignKey("sites.id", ondelete="CASCADE"), primary_key=True
+    )

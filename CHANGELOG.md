@@ -15,6 +15,22 @@ One entry per milestone from the project spec, Section 14.
   backoff while a file decode error stays fatal; zone-rectangle bounds checks;
   tests for decode decimation, reconnect give-up, and the new failure paths.
 
+### M6: Operator console (backend)
+- Operator REST API (`whaletale_cloud/api/operator/`): sites, spaces list with
+  current occupant, space detail (metrics + occupancy), occupants CRUD, the
+  schedule grid (spec 10.3, vacancy is a state not a blank), overview ranked by
+  capture rate with vacancies and box/camera health, and the per-space report
+  PDF.
+- Writes: create tenancy with conflict detection naming both tenancies (spec
+  8.3), delete tenancy (retroactive edit recomputes on the join), zone reshape
+  that closes the current version and inserts a new one with a "creates version
+  N" message (spec 5.2.2).
+- Auth: hashed bearer token per `operator_user`, every query scoped to the
+  user's sites (`operator_user_sites`); Alembic migration. Real Auth.js login
+  and the Next.js screens are the remaining M6 work.
+- `whaletale_cloud/schedule.py`: per-day occupant resolution reusing the
+  attribution tenancy rules.
+
 ### M5: Cloud API + sync
 - `shared/schemas/wire.py`: the edge <-> cloud sync contract (`IngestRequest`,
   `HeartbeatRequest`, ...), separate from the persisted-row models so a payload

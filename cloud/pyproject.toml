@@ -54,6 +54,8 @@ target-version = "py312"
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 
 [tool.ruff.lint.per-file-ignores]
+# FastAPI puts Query/Depends/Header calls in argument defaults by design.
+"whaletale_cloud/api/**" = ["B008"]
 # Alembic autogenerates these; long DDL lines and its own import order are fine.
 "migrations/versions/*" = ["E501", "I001"]
 

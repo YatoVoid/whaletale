@@ -101,6 +101,11 @@ DATABASE_URL=postgresql+psycopg://whaletale:whaletale@localhost:5432/whaletale \
 (`Authorization: Bearer ...`). Pair a box with `pair_edge_box()` (the operator
 console does this in M7). The edge's `whaletale-sync` targets this API.
 
+The same app serves the operator console API (M6 backend): `/v1/sites`,
+`/v1/spaces/{id}`, `/v1/sites/{id}/schedule`, `/v1/sites/{id}/overview`, plus
+tenancy and zone-reshape writes. Auth is a hashed bearer token per
+`operator_user` (`create_operator_user()`), scoped to that user's sites.
+
 The M3 report (Section 11 one-pager) is generated from seeded data:
 
 ```bash
@@ -112,7 +117,8 @@ skips it.
 
 ## Web
 
-Not built yet. Arrives in M6.
+Not built yet. The M6 operator console (Next.js App Router, Auth.js login,
+shadcn/ui, Recharts) is next; the API it consumes lives in `cloud/`.
 
 ## Development
 
