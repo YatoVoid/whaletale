@@ -117,6 +117,24 @@ cameras.
 | Console "Add camera" 422 | resolution not `WxH` | Enter e.g. `1920x1080`. |
 | Sealed credentials won't decrypt on the box | `WHALETALE_SITE_SECRET` differs from when they were sealed | Re-run `whaletale-onboard --emit` with the current secret. |
 
+## M8: fleet admin + alerts
+
+`GET /admin/fleet` (staff token `WHALETALE_ADMIN_TOKEN`) shows every site's
+health state and open alert conditions; `POST /admin/fleet/evaluate` persists
+them into `alerts` (run it on a schedule in prod). Sentry is wired but inert
+unless `SENTRY_DSN` is set.
+
+Alert conditions (spec 9): a camera dark > 1h → **customer**, plain language
+("Camera 4 has been offline since … Check that it has power"); sync stale > 6h,
+disk < 20%, mean confidence down > 30% from baseline, agent version behind → **us**.
+
+| Symptom | Cause | Action |
+|---|---|---|
+| `/admin/fleet` → 401 | `WHALETALE_ADMIN_TOKEN` unset or the bearer doesn't match | Set the env var on the API host; it's staff-only. |
+| A `disk_low` alert never fires on a real box | old agent that doesn't send `disk_total_bytes` | Upgrade the agent (M8 edge change). Free-bytes alone can't give a ratio. |
+| Alerts don't clear after the box recovers | `POST /admin/fleet/evaluate` hasn't run since | Schedule it (every few minutes). It resolves rows whose condition is gone. |
+| `low_confidence` noisy at dawn/dusk | IR switch / low sun; the baseline hasn't caught up | Expected transient. Persistent means a moved or failing camera (spec 8.1). |
+
 ## Later milestones
 
 Filled in as each merges. Cloud/site alerting starts at M8.

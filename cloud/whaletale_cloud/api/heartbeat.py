@@ -32,6 +32,7 @@ def heartbeat(
             cpu_percent=payload.cpu_percent,
             mem_percent=payload.mem_percent,
             disk_free_bytes=payload.disk_free_bytes,
+            disk_total_bytes=payload.disk_total_bytes,
             buckets_pending_sync=payload.buckets_pending_sync,
             last_sync_at=payload.last_sync_at,
             per_camera=[c.model_dump(mode="json") for c in payload.per_camera],

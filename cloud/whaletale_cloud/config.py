@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     baseline_weeks: int = Field(default=4, validation_alias="WHALETALE_BASELINE_WEEKS")
     # spec 6.5: standard deviations from baseline before a bucket is flagged.
     anomaly_sigma: float = Field(default=2.0, validation_alias="WHALETALE_ANOMALY_SIGMA")
+    # spec 9: the internal fleet admin API. Unset disables it.
+    admin_token: str = Field(default="", validation_alias="WHALETALE_ADMIN_TOKEN")
+    # spec 9: Sentry for exceptions.
+    sentry_dsn: str = Field(default="", validation_alias="SENTRY_DSN")
 
 
 settings = Settings()

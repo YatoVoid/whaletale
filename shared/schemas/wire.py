@@ -71,6 +71,7 @@ class HeartbeatRequest(_Wire):
     cpu_percent: float | None = None
     mem_percent: float | None = None
     disk_free_bytes: int
+    disk_total_bytes: int | None = None  # so "disk < 20%" (spec 9) is computable
     buckets_pending_sync: int = Field(ge=0)
     last_sync_at: datetime | None = None
     per_camera: list[CameraHealthIn] = Field(default_factory=list)
