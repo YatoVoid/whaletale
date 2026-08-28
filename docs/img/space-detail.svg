@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="372" viewBox="0 0 1024 372" font-family="Noto Sans, DejaVu Sans, Helvetica, Arial, sans-serif">
+  <defs>
+    <pattern id="hatch" width="4" height="4" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+      <line x1="0" y1="0" x2="0" y2="4" stroke="#d7d3c8" stroke-width="1.4"/>
+    </pattern>
+  </defs>
+  <rect width="1024" height="372" fill="#f6f5f1"/>
+  <rect x="0" y="0" width="1024" height="34" fill="#fbfaf7"/>
+  <line x1="0" y1="34" x2="1024" y2="34" stroke="#d7d3c8"/>
+  <circle cx="20" cy="17" r="4" fill="none" stroke="#d7d3c8"/><circle cx="36" cy="17" r="4" fill="none" stroke="#d7d3c8"/><circle cx="52" cy="17" r="4" fill="none" stroke="#d7d3c8"/>
+  <text x="76" y="21" font-family="Noto Sans Mono, DejaVu Sans Mono, monospace" font-size="11" fill="#5c584e">console.whaletale.local  /spaces/rosas-tamales</text>
+
+  <line x1="150" y1="34" x2="150" y2="372" stroke="#d7d3c8"/>
+  <text x="20" y="66" font-family="DejaVu Serif, Noto Serif, serif" font-size="17" fill="#1b1a16">WhaleTale</text>
+  <text x="20" y="82" font-size="10.5" fill="#5c584e">Cedar Street Market</text>
+  <text x="20" y="114" font-size="12" fill="#5c584e">Overview</text>
+  <text x="20" y="144" font-size="12" fill="#5c584e">Schedule</text>
+  <rect x="10" y="156" width="130" height="24" fill="#2f4f4f" fill-opacity="0.10"/>
+  <text x="20" y="172" font-size="12" fill="#1b1a16">Spaces</text>
+  <text x="20" y="202" font-size="12" fill="#5c584e">Occupants</text>
+  <text x="20" y="228" font-size="12" fill="#5c584e">Reports</text>
+  <text x="20" y="254" font-size="12" fill="#5c584e">Settings</text>
+
+  <text x="184" y="74" font-family="DejaVu Serif, Noto Serif, serif" font-size="25" fill="#1b1a16">Stall 1</text>
+  <text x="184" y="94" font-size="11.5" fill="#5c584e">stall · Rosa's Tamales</text>
+  <rect x="740" y="54" width="98" height="26" fill="none" stroke="#d7d3c8"/>
+  <text x="789" y="71" font-size="11" fill="#5c584e" text-anchor="middle">Edit zone</text>
+  <rect x="850" y="54" width="118" height="26" fill="none" stroke="#2f4f4f"/>
+  <text x="909" y="71" font-size="11" fill="#2f4f4f" text-anchor="middle">Report (PDF)</text>
+
+  <text x="184" y="120" font-size="10.5" fill="#5c584e">Jun 2 – Jun 8 · stall · <tspan fill="#8a7d5c">2 degraded</tspan>   <tspan fill="#8a7d5c">1 low-confidence</tspan></text>
+
+  <line x1="184" y1="136" x2="968" y2="136" stroke="#d7d3c8"/>
+  <line x1="184" y1="210" x2="968" y2="210" stroke="#d7d3c8"/>
+
+  <g font-family="DejaVu Serif, Noto Serif, serif" fill="#1b1a16">
+    <text x="184" y="176" font-size="22">612</text>
+    <text x="380" y="176" font-size="22">18%</text>
+    <text x="576" y="176" font-size="22">71%</text>
+    <text x="772" y="176" font-size="22">2m 40s</text>
+  </g>
+  <path d="M232 160 l6 10 h-12 z" fill="none" stroke="#b23a26" stroke-width="1.6" stroke-linejoin="round"/>
+  <g font-size="10" fill="#5c584e">
+    <text x="184" y="196" text-decoration="underline">entries</text><text x="234" y="196"> · Jun 2–8</text>
+    <text x="380" y="196" text-decoration="underline">traffic share</text><text x="452" y="196"> · Jun 2–8</text>
+    <text x="576" y="196" text-decoration="underline">capture rate</text><text x="648" y="196"> · rank 1 of 6 stalls</text>
+    <text x="772" y="196" text-decoration="underline">median dwell</text><text x="844" y="196"> · Jun 2–8</text>
+  </g>
+
+  <text x="184" y="252" font-family="DejaVu Serif, Noto Serif, serif" font-size="15" fill="#1b1a16">Who held this space</text>
+  <g>
+    <rect x="184" y="264" width="470" height="30" fill="#2f4f4f"/>
+    <rect x="654" y="264" width="94" height="30" fill="url(#hatch)" stroke="#d7d3c8"/>
+    <rect x="748" y="264" width="188" height="30" fill="#2f4f4f"/>
+    <line x1="654" y1="264" x2="654" y2="294" stroke="#f6f5f1" stroke-width="2"/>
+    <line x1="748" y1="264" x2="748" y2="294" stroke="#f6f5f1" stroke-width="2"/>
+    <text x="419" y="284" font-size="10" fill="#f6f5f1" text-anchor="middle">Rosa's Tamales</text>
+    <text x="701" y="284" font-size="10" fill="#5c584e" text-anchor="middle">vacant</text>
+    <text x="842" y="284" font-size="10" fill="#f6f5f1" text-anchor="middle">Rosa's Tamales</text>
+  </g>
+  <text x="184" y="312" font-size="9.5" fill="#5c584e">Jun 2</text>
+  <text x="936" y="312" font-size="9.5" fill="#5c584e" text-anchor="end">Jun 8</text>
+
+  <text x="184" y="352" font-size="10" fill="#5c584e" font-style="italic">Rendering of the operator console. Every figure carries its unit and links to its definition; the triangle marks an anomaly.</text>
+</svg>
