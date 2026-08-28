@@ -73,6 +73,21 @@ only as a SHA-256. Still no central alerting on the telemetry - that is M8.
 | `HTTP 429` from ingest | one box is pushing faster than the per-token limit (120/min) | Normal backpressure; the client retries. A persistent 429 means a misbehaving box - check its loop interval. |
 | Ingest returns 200 but rows do not appear | the request hit a different API instance / DB | Confirm `DATABASE_URL`. Ingest is idempotent, so a resend is safe. |
 
+## M6: operator console (backend)
+
+The operator-facing REST API (`/v1/sites`, `/v1/spaces/{id}`, `/v1/sites/{id}/schedule`,
+`/v1/sites/{id}/overview`, tenancy and zone-reshape writes). Auth is a hashed
+bearer token per `operator_user`, scoped to that user's sites. The Next.js
+console (Auth.js login, the screens) is the remaining M6 work.
+
+| Symptom | Cause | Action |
+|---|---|---|
+| Console request returns 403 | the user is not linked to that site | Add an `operator_user_sites` row (the settings screen will do this in M8/M9). |
+| `POST .../tenancies` returns 409 | overlaps an existing tenancy | The response body lists `conflicting_tenancy_ids`. The operator edits or removes the other tenancy first (spec 8.3). |
+| Reshape returns 409 "no open primary" | the space has no primary zone version yet | The space was never onboarded (M7). Onboard the camera/zone first. |
+| Schedule grid slow for a wide range | it resolves every (space, day) with RRULE expansion | Capped at 62 days per request. The console pages by month. |
+| A renamed occupant still shows the old name somewhere | a cached response | The DB is correct (rename is in place, spec 8.3); the console just needs to refetch. |
+
 ## Later milestones
 
 Filled in as each merges. Cloud/site alerting starts at M8.
