@@ -57,7 +57,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: system libs for WeasyPrint
-        run: sudo apt-get update && sudo apt-get install -y libpango-1.0-0 libpangoft2-1.0-0
+        # `|| true` on update: unrelated third-party repos on the runner image
+        # sometimes 403. The pango packages come from the main Ubuntu repos.
+        run: |
+          sudo apt-get update || true
+          sudo apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
