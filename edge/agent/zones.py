@@ -65,6 +65,24 @@ class Zone:
         return bool(self._catchment_poly.covers(Point(gp)))
 
 
+class ExclusionMask:
+    """spec 8.2: an area the operator marks as staff-only (behind a counter, a
+    corridor). A detection whose ground point falls inside is dropped before any
+    counting zone sees it, so repeated staff crossings stop inflating entries.
+    A small buffer keeps a foot on the boundary line excluded."""
+
+    def __init__(self, polygon: list[tuple[float, float]], *, margin: float = 0.01) -> None:
+        if len(polygon) < 3:
+            raise ValueError(f"exclusion mask needs >= 3 points, got {len(polygon)}")
+        poly = Polygon(polygon)
+        if not poly.is_valid:
+            raise ValueError("exclusion mask polygon is self-intersecting")
+        self._poly = poly.buffer(margin) if margin else poly
+
+    def contains(self, gp: tuple[float, float]) -> bool:
+        return bool(self._poly.covers(Point(gp)))
+
+
 def default_zone(exit_margin: float = 0.02, catchment_margin: float = 0.08) -> Zone:
     return Zone(
         "zone-1",
