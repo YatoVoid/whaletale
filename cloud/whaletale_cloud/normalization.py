@@ -13,8 +13,9 @@ silently excluded (spec 6.5).
 from __future__ import annotations
 
 import statistics
+from collections.abc import Iterator
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
@@ -111,6 +112,49 @@ def normalize_space(
         capture_rate_vs_self=capture_cmp,
         peer_rank=peer,
     )
+
+
+@dataclass(frozen=True)
+class DailyAnomaly:
+    day: date
+    entries: SelfComparison
+    capture_rate: SelfComparison
+
+
+def iter_daily_anomalies(
+    session: Session,
+    space_id: UUID,
+    start: datetime,
+    end: datetime,
+    *,
+    baseline_weeks: int | None = None,
+    anomaly_sigma: float | None = None,
+) -> Iterator[DailyAnomaly]:
+    """One `normalize_space` per local day in the period; yields only the days
+    where entries or capture rate is an anomaly (spec 6.5)."""
+    space = session.get(m.Space, space_id)
+    if space is None:
+        raise LookupError(f"no space {space_id}")
+    site = session.get(m.Site, space.site_id)
+    assert site is not None
+    tz = ZoneInfo(site.timezone)
+
+    day = start.astimezone(tz).date()
+    last = end.astimezone(tz).date()
+    while day < last:
+        d0 = datetime.combine(day, time(0), tzinfo=tz).astimezone(UTC)
+        d1 = datetime.combine(day + timedelta(days=1), time(0), tzinfo=tz).astimezone(UTC)
+        rep = normalize_space(
+            session,
+            space_id,
+            d0,
+            d1,
+            baseline_weeks=baseline_weeks,
+            anomaly_sigma=anomaly_sigma,
+        )
+        if rep.entries_vs_self.is_anomaly or rep.capture_rate_vs_self.is_anomaly:
+            yield DailyAnomaly(day, rep.entries_vs_self, rep.capture_rate_vs_self)
+        day += timedelta(days=1)
 
 
 def _compare(metric: str, value: float, baseline: list[float], sigma: float) -> SelfComparison:

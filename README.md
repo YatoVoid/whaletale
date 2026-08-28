@@ -70,6 +70,15 @@ if the models and the migration head disagree.
 Shared types live in `shared/schemas/` (Pydantic v2). The cloud ORM mirrors them
 and a test fails on drift. TypeScript generation arrives with the web app in M6.
 
+The M3 report (Section 11 one-pager) is generated from seeded data:
+
+```bash
+uv run whaletale-report --seed --out report   # writes report.html and report.pdf
+```
+
+PDF rendering (WeasyPrint) needs `libpango-1.0-0 libpangoft2-1.0-0`; `--html-only`
+skips it.
+
 ## Web
 
 Not built yet. Arrives in M6.

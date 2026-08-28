@@ -56,6 +56,8 @@ jobs:
       WHALETALE_TEST_DATABASE_URL: postgresql+psycopg://whaletale:whaletale@localhost:5432/whaletale
     steps:
       - uses: actions/checkout@v4
+      - name: system libs for WeasyPrint
+        run: sudo apt-get update && sudo apt-get install -y libpango-1.0-0 libpangoft2-1.0-0
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true

@@ -39,11 +39,18 @@ Before adding any vision dependency, check its license and add a row here.
 | Recurrence (RRULE) | `python-dateutil` | BSD-3-Clause / Apache-2.0 (dual) | 2026-08-27 |
 | Polygon geometry | `shapely` | BSD-3-Clause | 2026-08-27 |
 | Test Postgres (dev) | `testcontainers` | Apache-2.0 | 2026-08-27 |
+| Report templating (M3) | `jinja2` | BSD-3-Clause | 2026-08-28 |
+| HTML to PDF (M3) | `weasyprint` (+ `pydyf`, `tinycss2`, `tinyhtml5`) | BSD-3-Clause | 2026-08-28 |
+| Hyphenation, via WeasyPrint | `pyphen` | GPLv2+ / LGPLv2+ / MPL-1.1 (disjunctive) | 2026-08-28 |
 
 `psycopg` is LGPL-3.0. Same standing as FFmpeg (Section 3): the library is
 imported unmodified and runs server-side, never distributed to a user, so the
 LGPL relink obligation is not triggered. The license audit allows LGPL; it fails
 only on AGPL/GPL.
+
+`pyphen` is disjunctively licensed (GPLv2+ **or** LGPLv2+ **or** MPL-1.1); we
+take the LGPL/MPL arm. `license_audit.py` clears a GPL classifier when an LGPL
+or permissive classifier sits beside it on the same distribution.
 
 ## Transitive, reviewed
 

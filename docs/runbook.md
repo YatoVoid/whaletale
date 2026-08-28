@@ -31,6 +31,18 @@ deployment, no live sync yet (that is M5). Failure modes while developing:
 | A report period looks wrong across a DST change | Bucket alignment done in UTC instead of site-local | Buckets are aligned in `sites.timezone` then stored UTC (spec 5.2.5). Confirm the site timezone is a valid IANA name. |
 | `IntegrityError` on a second primary zone version | Two open primary versions for one space | Close the old one (`effective_to = now`) before inserting the new (spec 5.2.2, 6.6). |
 
+## M3: report
+
+The Section 11 one-pager, HTML and PDF, generated from seeded data. No
+deployment. `uv run whaletale-report --seed --out report`.
+
+| Symptom | Cause | Action |
+|---|---|---|
+| `cannot load library 'libpango...'` on PDF render | WeasyPrint system libs missing | `sudo apt-get install libpango-1.0-0 libpangoft2-1.0-0` (in CI this is a workflow step). HTML output still works without them: use `--html-only`. |
+| `error: no observations; run the seed first` | Empty database | `uv run whaletale-report --seed ...`, or seed separately. |
+| Report "flagged as anomalous" for a whole week | The period contains a festival/closure day | Expected. The per-day anomaly table below the headline shows which day and its annotation. |
+| Anomaly table slow on a long period | One `normalize_space` per day, each with its own trailing-weeks queries | Fine for a week or a month. A quarter-long report needs the day loop batched; not done yet. |
+
 ## Later milestones
 
 Filled in as each merges. Cloud/site alerting starts at M8.

@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{ d.space_name }} — {{ d.period_start.isoformat() }} to {{ d.period_end.isoformat() }}</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: Georgia, "Times New Roman", serif;
+    color: #23201b;
+    font-size: 10.5pt;
+    line-height: 1.4;
+    margin: 0;
+  }
+  h1 { font-size: 18pt; margin: 0 0 2mm; font-weight: normal; }
+  h2 {
+    font-size: 11pt; font-weight: normal; text-transform: uppercase;
+    letter-spacing: 0.08em; color: #6a6558;
+    border-bottom: 1px solid #d8d3c8; padding-bottom: 1mm; margin: 7mm 0 3mm;
+  }
+  .sub { color: #6a6558; margin: 0 0 6mm; }
+  .kpis { display: flex; gap: 6mm; margin-bottom: 2mm; }
+  .kpi { flex: 1; border-left: 2px solid #3d5a5b; padding-left: 3mm; }
+  .kpi .n { font-size: 16pt; }
+  .kpi .l { color: #6a6558; font-size: 9pt; }
+  .compare { color: #6a6558; font-size: 9.5pt; margin: 1mm 0 0; }
+  .flag { color: #a8452f; }
+  table { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
+  th { text-align: left; color: #6a6558; font-weight: normal; border-bottom: 1px solid #d8d3c8; padding: 1.5mm 2mm; }
+  td { padding: 1.5mm 2mm; border-bottom: 1px solid #efe9dd; }
+  .chart { margin: 2mm 0 1mm; }
+  .note { color: #6a6558; font-size: 8.5pt; margin-top: 8mm; border-top: 1px solid #d8d3c8; padding-top: 2mm; }
+  .empty { color: #6a6558; font-style: italic; }
+</style>
+</head>
+<body>
+  <h1>{{ d.space_name }}</h1>
+  <p class="sub">
+    {{ d.space_kind|capitalize }} at {{ d.site_name }} ·
+    {{ d.period_start.strftime("%a %-d %b %Y") }} – {{ d.period_end.strftime("%a %-d %b %Y") }}
+    ({{ d.site_timezone }})
+  </p>
+
+  <div class="kpis">
+    <div class="kpi">
+      <div class="n">{{ "{:,}".format(d.entries) }}</div>
+      <div class="l">entries · this period</div>
+    </div>
+    <div class="kpi">
+      <div class="n">{{ pct(d.traffic_share) }}</div>
+      <div class="l">
+        traffic share
+        {%- if d.peer_rank %} · rank {{ d.peer_rank.rank }} of {{ d.peer_rank.peer_count }} {{ d.space_kind }}s{% endif %}
+      </div>
+    </div>
+    <div class="kpi">
+      <div class="n">{{ pct(d.capture_rate) }}</div>
+      <div class="l">capture rate {% if d.peer_rank %}{{ peer_strip(d.peer_rank.rank, d.peer_rank.peer_count)|safe }}{% endif %}</div>
+    </div>
+    <div class="kpi">
+      <div class="n">{{ dur(d.median_dwell_seconds) }}</div>
+      <div class="l">median dwell (estimated)</div>
+    </div>
+  </div>
+
+  <p class="compare">
+    Entries vs the trailing {{ d.entries_vs_self.baseline_n }} same-weekday periods:
+    baseline {{ "{:,.0f}".format(d.entries_vs_self.baseline_mean) }}
+    {%- if d.entries_vs_self.z_score is not none %}, {{ zlabel(d.entries_vs_self.z_score) }}{% endif %}
+    {%- if d.entries_vs_self.is_anomaly %} <span class="flag">— flagged as anomalous</span>{% endif %}.
+    Capture rate vs baseline {{ pct(d.capture_rate_vs_self.baseline_mean) }}
+    {%- if d.capture_rate_vs_self.is_anomaly %} <span class="flag">— flagged</span>{% endif %}.
+  </p>
+
+  <h2>Hourly pattern</h2>
+  <div class="chart">{{ hourly_svg|safe }}</div>
+
+  <h2>Daily pattern</h2>
+  <div class="chart">{{ daily_svg|safe }}</div>
+
+  <h2>Who held this space</h2>
+  <div class="chart">{{ occupancy_svg|safe }}</div>
+
+  <h2>Anomalous days</h2>
+  {% if d.anomalies %}
+  <table>
+    <thead><tr><th>Day</th><th>Entries</th><th>Baseline</th><th>Deviation</th><th>Context</th></tr></thead>
+    <tbody>
+    {% for a in d.anomalies %}
+      <tr>
+        <td>{{ a.day.strftime("%a %-d %b") }}</td>
+        <td>{{ "{:,}".format(a.entries_value) }}</td>
+        <td>{{ "{:,.0f}".format(a.entries_baseline_mean) }}</td>
+        <td>{% if a.entries_z is not none %}{{ zlabel(a.entries_z) }}{% else %}—{% endif %}</td>
+        <td>{% if a.annotation_label %}{{ a.annotation_kind }}: {{ a.annotation_label }}{% else %}<span class="empty">no annotation</span>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">No days in this period were more than {{ sigma }} SD from the trailing baseline.</p>
+  {% endif %}
+
+  <p class="note">
+    {% if d.degraded_bucket_count %}{{ d.degraded_bucket_count }} bucket(s) fell back to a secondary camera and are marked degraded. {% endif %}
+    Metric definitions: entry, capture rate, traffic share, dwell, passerby — see docs/metrics.md.
+    Generated {{ d.generated_at.strftime("%Y-%m-%d %H:%M UTC") }}.
+  </p>
+</body>
+</html>

@@ -10,6 +10,10 @@ scipy, and matplotlib all embed whole third-party license texts there (some of
 which quote GPL/Affero notices for bundled components), so keyword matching on
 it produces false positives on BSD-licensed core packages.
 
+A GPL classifier that appears alongside an LGPL or permissive classifier on the
+same distribution is treated as one arm of a disjunctive license (pick the other
+arm), not a violation.
+
 A short name denylist backstops the specific AGPL packages the spec calls out,
 in case a future release of one ships without a classifier.
 
@@ -33,14 +37,37 @@ def classifiers(dist: metadata.Distribution) -> list[str]:
     return [c for c in dist.metadata.get_all("Classifier", []) if c.startswith("License ::")]
 
 
+# Classifiers whose presence means a GPL classifier on the same distribution is
+# one arm of a disjunctive ("GPL or LGPL or MPL") license, not an obligation.
+_DISJUNCTIVE_ESCAPE = (
+    "lesser",  # LGPL
+    "mozilla public license",
+    "bsd license",
+    "mit license",
+    "apache software license",
+    "python software foundation",
+)
+
+
 def copyleft_classifier(dist: metadata.Distribution) -> str | None:
-    for c in classifiers(dist):
-        low = c.lower()
-        if "lesser" in low:  # LGPL is fine (dynamic link)
-            continue
-        if "gnu affero" in low or "gnu general public license" in low:
-            return c
-    return None
+    found = classifiers(dist)
+    lowered = [c.lower() for c in found]
+    gpl = next(
+        (
+            c
+            for c, low in zip(found, lowered, strict=True)
+            if "lesser" not in low
+            and ("gnu affero" in low or "gnu general public license" in low)
+        ),
+        None,
+    )
+    if gpl is None:
+        return None
+    # A permissive or LGPL classifier alongside the GPL one means we can take
+    # that arm instead (e.g. pyphen: GPLv2+ / LGPLv2+ / MPL-1.1).
+    if any(esc in low for low in lowered for esc in _DISJUNCTIVE_ESCAPE):
+        return None
+    return gpl
 
 
 def is_copyleft(dist: metadata.Distribution) -> str | None:

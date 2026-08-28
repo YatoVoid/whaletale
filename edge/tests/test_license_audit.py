@@ -54,6 +54,28 @@ def test_gpl_classifier_is_flagged() -> None:
     assert license_audit.is_copyleft(gpl) is not None
 
 
+def test_disjunctive_gpl_or_mpl_is_allowed() -> None:
+    # pyphen ships GPLv2+ / LGPLv2+ / MPL-1.1 classifiers together; we take a
+    # non-GPL arm.
+    d = fake_dist(
+        classifiers=(
+            "License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)",
+            "License :: OSI Approved :: Mozilla Public License 1.1 (MPL 1.1)",
+        )
+    )
+    assert license_audit.is_copyleft(d) is None
+
+
+def test_gpl_alongside_bsd_is_allowed() -> None:
+    d = fake_dist(
+        classifiers=(
+            "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+            "License :: OSI Approved :: BSD License",
+        )
+    )
+    assert license_audit.is_copyleft(d) is None
+
+
 def test_free_text_license_is_not_scanned() -> None:
     # numpy/scipy/matplotlib embed third-party license texts (some quoting GPL /
     # Affero) in the free-text field. Classifier is the authority.
