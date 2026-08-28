@@ -61,8 +61,13 @@ plugins = ["pydantic.mypy"]
 module = "testcontainers.*"
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = "shapely.*"
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
 [tool.coverage.run]
-omit = ["tests/*", "migrations/*"]
+# db.py is the runtime engine/session singleton, exercised by the app, not units.
+omit = ["tests/*", "migrations/*", "whaletale_cloud/db.py"]

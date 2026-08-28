@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
@@ -86,16 +86,11 @@ def attribute_space(
     buckets = sorted({o.bucket_start for o in observations})
 
     occupants = {
-        o.id: o
-        for o in session.scalars(
-            select(m.Occupant).where(m.Occupant.site_id == site.id)
-        )
+        o.id: o for o in session.scalars(select(m.Occupant).where(m.Occupant.site_id == site.id))
     }
     tenancies = list(
         session.scalars(
-            select(m.Tenancy)
-            .where(m.Tenancy.space_id == space_id)
-            .order_by(m.Tenancy.created_at)
+            select(m.Tenancy).where(m.Tenancy.space_id == space_id).order_by(m.Tenancy.created_at)
         )
     )
     closures = _closure_days(session, site.id, start, end, tz)
@@ -153,9 +148,7 @@ def _resolve_bucket(
     return None, None, BucketQuality.OK
 
 
-def _effective_version(
-    versions: Iterable[m.ZoneVersion], when: datetime
-) -> m.ZoneVersion | None:
+def _effective_version(versions: Iterable[m.ZoneVersion], when: datetime) -> m.ZoneVersion | None:
     for v in versions:
         if _covers(v, when):
             return v
@@ -178,6 +171,29 @@ def _closure_days(
         )
     )
     return set(rows)
+
+
+def active_dates(t: m.Tenancy, window_start: date, window_end: date) -> set[date]:
+    """Local calendar dates in ``[window_start, window_end]`` on which this
+    tenancy is active. Ignores the daily time window; that is handled per bucket.
+    Shared by attribution and by save-time conflict checks."""
+    lo = max(window_start, t.starts_on)
+    hi = min(window_end, t.ends_on) if t.ends_on is not None else window_end
+    if lo > hi:
+        return set()
+    if t.kind is TenancyKind.ONE_OFF:
+        return {t.starts_on} if lo <= t.starts_on <= hi else set()
+    if t.kind is TenancyKind.PERMANENT:
+        return {lo + timedelta(days=i) for i in range((hi - lo).days + 1)}
+    if not t.recurrence_rule:
+        return set()
+    rule = rrulestr(t.recurrence_rule, dtstart=datetime.combine(t.starts_on, time()))
+    return {
+        occ.date()
+        for occ in rule.between(
+            datetime.combine(lo, time()), datetime.combine(hi, time()), inc=True
+        )
+    }
 
 
 def _recurrence_dates(
