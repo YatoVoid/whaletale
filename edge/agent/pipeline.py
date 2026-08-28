@@ -29,7 +29,7 @@ from agent.store import (
     SiteTotalRecord,
 )
 from agent.track import GroundPointTracker
-from agent.zones import ground_point
+from agent.zones import ExclusionMask, ground_point
 
 
 class Detector(Protocol):
@@ -177,9 +177,18 @@ class MultiCameraPipeline:
         self._site_cameras: dict[datetime, set[str]] = {}
         self._site_written: set[datetime] = set()
 
+        # spec 8.2: excluded zones are staff-only masks, not counting zones.
+        self._exclusions_by_cam: dict[str, list[ExclusionMask]] = {}
+        for cam in site.cameras:
+            masks = [ExclusionMask(zc.polygon) for zc in cam.zones if zc.excluded]
+            if masks:
+                self._exclusions_by_cam[cam.name] = masks
+
         self._runners: list[_ZoneRunner] = []
         for cam in site.cameras:
             for zc in cam.zones:
+                if zc.excluded:
+                    continue
                 zone = zc.build_zone(exit_margin=exit_margin, catchment_margin=catchment_margin)
                 runner = _ZoneRunner(
                     cam.name,
@@ -272,6 +281,7 @@ class MultiCameraPipeline:
                 acc.last_at = captured_at
                 if w.cam.name in self._recalib_flagged:
                     continue  # camera moved: stop counting rather than count wrong
+                dets = self._drop_excluded(w.cam.name, dets)
                 acc.det_count += len(dets)
                 acc.score_sum += sum(score for _b, score in dets)
                 for runner in self._runners_by_cam.get(w.cam.name, []):
@@ -280,6 +290,14 @@ class MultiCameraPipeline:
                 self._last_recalib_check = time.monotonic()
             if time.monotonic() - self._last_health_flush >= self._health_flush_seconds:
                 self._flush_camera_health()
+
+    def _drop_excluded(
+        self, camera_name: str, dets: list[tuple[BBoxNorm, float]]
+    ) -> list[tuple[BBoxNorm, float]]:
+        masks = self._exclusions_by_cam.get(camera_name)
+        if not masks:
+            return dets
+        return [d for d in dets if not any(mask.contains(ground_point(d[0])) for mask in masks)]
 
     def _check_drift(self, camera_name: str, frame: Frame) -> None:
         assert self._refstore is not None

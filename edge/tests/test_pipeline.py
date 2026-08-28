@@ -97,6 +97,62 @@ def test_frozen_stream_surfaces_a_worker_error(tmp_path: Path) -> None:
     store.close()
 
 
+class _TwoPeople:
+    """One detection with its feet in the counting zone, one in the staff area."""
+
+    IN_ZONE: BBoxNorm = (0.55, 0.75, 0.65, 0.85)  # ground point (0.60, 0.85)
+    IN_STAFF: BBoxNorm = (0.35, 0.75, 0.45, 0.85)  # ground point (0.40, 0.85)
+
+    def detect_batch(self, frames: list[Frame]) -> list[list[tuple[BBoxNorm, float]]]:
+        return [[(self.IN_ZONE, 0.95), (self.IN_STAFF, 0.95)] for _ in frames]
+
+
+def _config_with_exclusion(clip: Path) -> object:
+    return parse_site_config(
+        {
+            "site_id": "site-1",
+            "cloud_url": "https://example.test",
+            "pairing_token": "tok",
+            "cameras": [
+                {
+                    "name": "cam-a",
+                    "source": str(clip),
+                    "zones": [
+                        {"zone_version_id": "zv-a", "polygon": ZONE_POLY},
+                        {
+                            "zone_version_id": "excl-a",
+                            "polygon": [[0.3, 0.4], [0.5, 0.4], [0.5, 0.9], [0.3, 0.9]],
+                            "excluded": True,
+                        },
+                    ],
+                }
+            ],
+        }
+    )
+
+
+def test_excluded_zone_masks_staff_detections(tmp_path: Path) -> None:
+    clip = tmp_path / "a.mp4"
+    _write_clip(clip, n_frames=90, rate=15)
+    store = BucketStore(tmp_path / "edge.db")
+    pipeline = MultiCameraPipeline(
+        _config_with_exclusion(clip),  # type: ignore[arg-type]
+        _TwoPeople(),
+        store,
+        fps=4.0,
+        min_dwell_seconds=0.0,
+        bucket_seconds=5,
+        clock=_FakeClock(datetime(2026, 6, 1, 12, 0, tzinfo=UTC)),
+    )
+    pipeline.run(stop=lambda: False)
+    pipeline.close()
+
+    obs = store.unsynced_observations()
+    assert {o["zone_version_id"] for o in obs} == {"zv-a"}  # no runner for the excluded zone
+    assert max(o["peak_occupancy"] for o in obs) == 1  # the staff detection never enters
+    store.close()
+
+
 def _moving_stripe_clip(path: Path, n_frames: int) -> None:
     container = av.open(str(path), "w")
     stream = container.add_stream("rawvideo", rate=15)
