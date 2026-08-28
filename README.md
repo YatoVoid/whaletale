@@ -13,6 +13,40 @@ ever stored.
 run/use/edge-case reference with interface renderings of every console view.
 Served at the repository's GitHub Pages URL when Pages is enabled on `/docs`.
 
+## The operator console
+
+Renderings of the Next.js console against the demo site (Cedar Street Market).
+The visual world is a working drawing set: flat ink on paper, hairline rules,
+the grid as the structure (see `DESIGN.md`). These are simulated views, not
+screenshots of a live deployment; the console is a local app you run against
+your cloud API.
+
+**Overview:** site health strip, then every space ranked by capture rate.
+
+![WhaleTale console, Overview screen](docs/img/overview.png)
+
+**Space detail:** the four headline figures with their units and periods, an
+anomaly mark, degraded and low-confidence bucket counts, and the occupancy
+timeline (vacancy hatched, a state rather than a gap).
+
+![WhaleTale console, Space detail screen](docs/img/space-detail.png)
+
+**Schedule:** spaces by day. A permanent tenant fills every cell; a
+Saturday-only stand fills one; a vacant space is hatched.
+
+![WhaleTale console, Schedule screen](docs/img/schedule.png)
+
+**Zone editor:** draw the counting polygon over a reference frame. Overlap with
+another zone on the same camera has to be confirmed.
+
+![WhaleTale console, Zone editor screen](docs/img/zone-editor.png)
+
+**Report:** the one-page PDF handed to a tenant. Server-rendered chart, the
+anomalous hour in the correction-mark red, an honest footnote for degraded or
+low-confidence intervals.
+
+![WhaleTale per-space report PDF](docs/img/report.png)
+
 ## Repository layout
 
 | Path | Contents |
@@ -133,7 +167,7 @@ skips it.
 
 ## Web (M6: operator console)
 
-Next.js App Router + TypeScript. The visual world is a working drawing set —
+Next.js App Router + TypeScript. The visual world is a working drawing set:
 flat ink on paper, hairline rules, the grid as the structure (see `DESIGN.md`).
 
 ```bash
