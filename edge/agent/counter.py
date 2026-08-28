@@ -187,8 +187,10 @@ class ZoneCounter:
             if t - dropped_at > self.reentry_seconds
         ]
         for tid in stale:
-            state, _ = self._parked.pop(tid)
-            self._classify_on_remove(state, t)
+            state, dropped_at = self._parked.pop(tid)
+            # classify at the drop time, not now: the grace window has expired
+            # without a re-entry, so the visit really ended when the track did.
+            self._classify_on_remove(state, dropped_at)
 
     def _classify_on_remove(self, ts: _TrackState, t: float) -> None:
         if ts.state is _State.INSIDE:
@@ -207,8 +209,8 @@ class ZoneCounter:
 
     def finalize(self, t: float) -> None:
         self.accrue_to(t)
-        for ts, _ in self._parked.values():
-            self._classify_on_remove(ts, t)
+        for ts, dropped_at in self._parked.values():
+            self._classify_on_remove(ts, dropped_at)
         self._parked.clear()
         for ts in self._tracks.values():
             self._classify_on_remove(ts, t)
