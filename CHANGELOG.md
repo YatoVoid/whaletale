@@ -26,6 +26,13 @@ One entry per milestone from the project spec, Section 14.
 - Cloud: `security_event()` writes one structured line to the `whaletale.security`
   logger for every auth failure, permission denial, rate-limit hit, and admin
   action, so they can be shipped somewhere queryable.
+- Edge + cloud: camera-drift detection (spec 8.1). `calibration.py` hashes the
+  live view (dHash) against an on-box reference; a fixed camera that gets bumped
+  or re-aimed diverges past `EDGE_DRIFT_HAMMING_THRESHOLD` bits over
+  `EDGE_DRIFT_SAMPLES` hourly checks, at which point the pipeline stops counting
+  it and reports `needs_recalibration` in the heartbeat. The cloud raises a
+  customer `camera_moved` alert. `whaletale-agent --recalibrate` re-captures the
+  references after a deliberate move. Reference hashes never leave the box.
 - Cloud + web: overlapping-zone confirmation (spec 8.3). `find_zone_overlaps`
   checks a proposed polygon against every other open primary zone on the same
   camera; `reshape_zone` returns 409 `zone_overlap` listing the spaces unless

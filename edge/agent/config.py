@@ -20,6 +20,16 @@ def _env_float(name: str, default: float) -> float:
         raise ConfigError(f"{name}={raw!r} is not a number") from None
 
 
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None or raw == "":
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        raise ConfigError(f"{name}={raw!r} is not an integer") from None
+
+
 @dataclass(frozen=True)
 class Config:
     target_fps: float = 4.0
@@ -53,6 +63,16 @@ class Config:
     # longer than this are treated as the camera going offline. 0 trips on the
     # first repeat.
     frozen_frame_seconds: float = 30.0
+    # Camera-drift detection (spec 8.1): a fixed camera that gets bumped keeps
+    # producing frames aimed at the wrong floor. A perceptual hash of the live
+    # view is compared to a reference captured at calibration time; a sustained
+    # divergence past `drift_hamming_threshold` bits (of 64) over `drift_samples`
+    # hourly checks flags the camera and the pipeline stops counting it. Empty
+    # `ref_dir` disables it; the agent otherwise uses `<sqlite dir>/refframes`.
+    ref_dir: str = ""
+    recalibration_check_seconds: float = 3600.0
+    drift_hamming_threshold: int = 12
+    drift_samples: int = 2
     # Rollup bucket width in stream-time seconds (spec 6.5). 15 minutes is the
     # usual foot-traffic granularity. A run shorter than one bucket produces a
     # single bucket.
@@ -82,6 +102,16 @@ class Config:
             raise ConfigError(f"reentry_distance must be >= 0, got {self.reentry_distance}")
         if self.frozen_frame_seconds < 0:
             raise ConfigError(f"frozen_frame_seconds must be >= 0, got {self.frozen_frame_seconds}")
+        if self.recalibration_check_seconds <= 0:
+            raise ConfigError(
+                f"recalibration_check_seconds must be > 0, got {self.recalibration_check_seconds}"
+            )
+        if not 0 <= self.drift_hamming_threshold <= 64:
+            raise ConfigError(
+                f"drift_hamming_threshold must be in [0, 64], got {self.drift_hamming_threshold}"
+            )
+        if self.drift_samples < 1:
+            raise ConfigError(f"drift_samples must be >= 1, got {self.drift_samples}")
         if self.bucket_seconds <= 0:
             raise ConfigError(f"bucket_seconds must be > 0, got {self.bucket_seconds}")
 
@@ -100,6 +130,10 @@ class Config:
             reentry_seconds=_env_float("EDGE_REENTRY_SECONDS", 2.0),
             reentry_distance=_env_float("EDGE_REENTRY_DISTANCE", 0.06),
             frozen_frame_seconds=_env_float("EDGE_FROZEN_FRAME_SECONDS", 30.0),
+            ref_dir=os.getenv("EDGE_REF_DIR", ""),
+            recalibration_check_seconds=_env_float("EDGE_RECALIBRATION_CHECK_SECONDS", 3600.0),
+            drift_hamming_threshold=_env_int("EDGE_DRIFT_HAMMING_THRESHOLD", 12),
+            drift_samples=_env_int("EDGE_DRIFT_SAMPLES", 2),
             bucket_seconds=_env_float("EDGE_BUCKET_SECONDS", 900.0),
             sqlite_path=os.getenv("EDGE_SQLITE_PATH", "./edge_local.db"),
             cloud_url=os.getenv("WHALETALE_CLOUD_URL", "https://api.whaletale.tech"),

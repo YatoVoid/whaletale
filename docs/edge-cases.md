@@ -13,7 +13,7 @@ a named refinement is not), **deferred** (not built, tracked below).
 |---|---|---|
 | Camera offline mid-bucket, mark partial, record `active_cameras`, no extrapolation | done | `pipeline.py` writes `active_cameras` per site-total from the set of cameras that produced a bucket; `test_wire_contract.test_edge_site_total_row_parses`, `test_admin_api.test_fleet_reports_state_and_alerts` |
 | Camera clock drift, reject frames > 60s from local time | not applicable | The agent stamps each frame with the box wall clock (`_CameraWorker`), never the camera's own timestamp, so a drifted camera clock cannot reach a bucket. Box-clock NTP is a deploy concern (`docs/runbook.md`). There is nothing to reject. |
-| Camera moved / re-aimed, perceptual hash vs hourly reference, flag `needs_recalibration`, stop counting | deferred | See below. |
+| Camera moved / re-aimed, perceptual hash vs hourly reference, flag `needs_recalibration`, stop counting | done | `calibration.py` (dHash + `DriftDetector` + on-box `RefStore`); the pipeline auto-captures a reference on the first check, re-checks hourly, and on sustained divergence flags the camera, stops feeding it to counting, and reports `needs_recalibration` in the heartbeat. The cloud raises a customer `camera_moved` alert. `whaletale-agent --recalibrate` re-captures references after a deliberate move. `test_calibration.*`, `test_pipeline.test_camera_drift_flags_and_pauses_counting`, `test_fleet.test_camera_moved_alerts_the_customer` |
 | Resolution / aspect ratio change, normalized polygons survive, flag for review | partial | Polygons are normalized end to end (`zones.py`, `test_zones.test_parse_zone_variants`); the review flag is not emitted. |
 | Frozen frame (identical consecutive frames > 30s), treat as offline | done | `decode.FrozenFrameDetector`, wired into `_CameraWorker`; a stalled source sets a `frozen frame` worker error like a decode failure. `EDGE_FROZEN_FRAME_SECONDS` (default 30). `test_decode.test_frozen_frame_detector_*`, `test_pipeline.test_frozen_stream_surfaces_a_worker_error` |
 | RTSP credentials rotated, specific operator-facing message | partial | `DecodeError` surfaces the underlying error string (`test_decode.test_file_decode_failure_is_fatal`); it is not classified as an auth failure with dedicated copy. |
@@ -75,21 +75,21 @@ These need a schema or product decision beyond a hardening pass, or edge-only
 work with a captured-frame constraint. None block the pilot; each is a known
 gap.
 
-1. **Perceptual-hash recalibration (§8.1).** Sample a reference frame hourly,
-   hash it, and when the hash diverges past a threshold flag the camera
-   `needs_recalibration` and stop counting. The reference frame and hash never
-   leave the box.
-2. **`low_confidence` on observation rows (§8.1).** The per-camera confidence
+1. **`low_confidence` on observation rows (§8.1).** The per-camera confidence
    signal now reaches the cloud fleet view; the remaining piece is stamping a
    `low_confidence` flag on the individual `observations` rows a camera
    produced while its confidence was depressed, so a report can grey them out.
-3. **Excluded zones and staff-hours filter (§8.2).** An `excluded` space kind
+2. **Excluded zones and staff-hours filter (§8.2).** An `excluded` space kind
    that the counter subtracts, plus a reporting toggle that drops configured
    staff-hour windows.
-4. **Glass-reflection sub-region exclusion (§8.2).** Let the operator mark
+3. **Glass-reflection sub-region exclusion (§8.2).** Let the operator mark
    holes inside a zone polygon that do not count.
-5. **Operating hours per site (§8.2).** Store open/close per weekday and skip
+4. **Operating hours per site (§8.2).** Store open/close per weekday and skip
    bucket emission outside them rather than relying on "no activity, no bucket".
+
+Customer-audience fleet alerts (`camera_dark`, `camera_moved`) currently
+surface only through `/admin/fleet` and `/admin/alerts`. An operator-facing
+alerts endpoint and a console banner are a separate piece of work.
 
 ## Known limitations
 

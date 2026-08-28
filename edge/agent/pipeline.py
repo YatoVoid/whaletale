@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 from typing import Protocol
 
 from agent.aggregate import WallClockAggregator, WallClockBucket
+from agent.calibration import DriftDetector, RefStore, dhash
 from agent.decode import DecodeError, FrozenFrameDetector, decode_frames
 from agent.detect import BBoxNorm, Frame
 from agent.siteconfig import CameraConfig, SiteConfig
@@ -138,6 +139,10 @@ class MultiCameraPipeline:
         reentry_distance: float = 0.0,
         frozen_frame_seconds: float = 30.0,
         health_flush_seconds: float = 60.0,
+        ref_dir: str | None = None,
+        recalibration_check_seconds: float = 3600.0,
+        drift_hamming_threshold: int = 12,
+        drift_samples: int = 2,
         clock: Clock | None = None,
     ) -> None:
         self.site = site
@@ -150,6 +155,22 @@ class MultiCameraPipeline:
         self._cam_accum: dict[str, _CamAccum] = {c.name: _CamAccum() for c in site.cameras}
         self._health_window_start = time.monotonic()
         self._last_health_flush = time.monotonic()
+
+        # spec 8.1: perceptual-hash drift detection. Missing ref_dir disables it.
+        self._refstore = RefStore(ref_dir) if ref_dir else None
+        self._drift_threshold = drift_hamming_threshold
+        self._drift_samples = drift_samples
+        self._recalib_check_seconds = recalibration_check_seconds
+        self._last_recalib_check = time.monotonic()
+        self._drift: dict[str, DriftDetector] = {}
+        self._recalib_flagged: set[str] = set()
+        if self._refstore is not None:
+            for c in site.cameras:
+                self._drift[c.name] = DriftDetector(
+                    self._refstore.get(c.name),
+                    threshold=drift_hamming_threshold,
+                    samples_needed=drift_samples,
+                )
 
         # site-total bookkeeping, keyed by bucket start
         self._site_entries: Counter[datetime] = Counter()
@@ -238,17 +259,40 @@ class MultiCameraPipeline:
                 if all(w.stopped for w in self._workers):
                     break
                 continue
+            drift_sweep = (
+                self._refstore is not None
+                and time.monotonic() - self._last_recalib_check >= self._recalib_check_seconds
+            )
             results = self.detector.detect_batch([f for _w, _t, f in batch])
-            for (w, captured_at, _frame), dets in zip(batch, results, strict=True):
+            for (w, captured_at, frame), dets in zip(batch, results, strict=True):
+                if drift_sweep:
+                    self._check_drift(w.cam.name, frame)
                 acc = self._cam_accum[w.cam.name]
                 acc.frames += 1
+                acc.last_at = captured_at
+                if w.cam.name in self._recalib_flagged:
+                    continue  # camera moved: stop counting rather than count wrong
                 acc.det_count += len(dets)
                 acc.score_sum += sum(score for _b, score in dets)
-                acc.last_at = captured_at
                 for runner in self._runners_by_cam.get(w.cam.name, []):
                     runner.process(captured_at, dets)
+            if drift_sweep:
+                self._last_recalib_check = time.monotonic()
             if time.monotonic() - self._last_health_flush >= self._health_flush_seconds:
                 self._flush_camera_health()
+
+    def _check_drift(self, camera_name: str, frame: Frame) -> None:
+        assert self._refstore is not None
+        h = dhash(frame)
+        det = self._drift.get(camera_name)
+        if det is None or det.reference is None:
+            self._refstore.set(camera_name, h)  # first clean view: capture the reference
+            self._drift[camera_name] = DriftDetector(
+                h, threshold=self._drift_threshold, samples_needed=self._drift_samples
+            )
+            return
+        if det.feed(h):
+            self._recalib_flagged.add(camera_name)
 
     def _flush_camera_health(self) -> None:
         elapsed = max(1e-6, time.monotonic() - self._health_window_start)
@@ -257,6 +301,8 @@ class MultiCameraPipeline:
             mc = acc.score_sum / acc.det_count if acc.det_count else None
             if w.error and "frozen" in w.error:
                 status = "frozen"
+            elif w.cam.name in self._recalib_flagged:
+                status = "needs_recalibration"
             elif w.error or acc.frames == 0:
                 status = "offline"
             else:
