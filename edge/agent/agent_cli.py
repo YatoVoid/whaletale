@@ -92,6 +92,7 @@ def main(argv: list[str] | None = None) -> int:
         bucket_seconds=int(cfg.bucket_seconds),
         reentry_seconds=cfg.reentry_seconds,
         reentry_distance=cfg.reentry_distance,
+        frozen_frame_seconds=cfg.frozen_frame_seconds,
     )
 
     stop_at = time.monotonic() + args.seconds if args.seconds else None

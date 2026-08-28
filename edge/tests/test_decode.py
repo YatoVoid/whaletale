@@ -8,7 +8,34 @@ import numpy as np
 import pytest
 
 from agent import decode
-from agent.decode import DecodeError, Frame, decode_frames, is_live_source, source_spec
+from agent.decode import (
+    DecodeError,
+    Frame,
+    FrozenFrameDetector,
+    decode_frames,
+    is_live_source,
+    source_spec,
+)
+
+
+def test_frozen_frame_detector_trips_only_after_the_threshold() -> None:
+    d = FrozenFrameDetector(after_seconds=30.0)
+    a = np.zeros((8, 8, 3), dtype=np.uint8)
+    assert d.check(a, now=0.0) is False  # first frame
+    assert d.check(a.copy(), now=10.0) is False  # first repeat: the freeze clock starts here
+    assert d.check(a.copy(), now=39.9) is False  # 29.9s frozen
+    assert d.check(a.copy(), now=40.0) is True  # 30s frozen, past the threshold
+
+
+def test_frozen_frame_detector_resets_on_a_changed_frame() -> None:
+    d = FrozenFrameDetector(after_seconds=5.0)
+    a = np.zeros((4, 4, 3), dtype=np.uint8)
+    b = np.ones((4, 4, 3), dtype=np.uint8)
+    d.check(a, now=0.0)
+    assert d.check(a.copy(), now=4.0) is False  # freeze clock starts at 4.0
+    assert d.check(b, now=6.0) is False  # scene changed, clock resets
+    assert d.check(b.copy(), now=10.0) is False  # new freeze clock starts at 10.0
+    assert d.check(b.copy(), now=15.0) is True  # 5s into the new freeze
 
 
 def test_webcam_index_maps_to_v4l2_device() -> None:

@@ -48,6 +48,11 @@ class Config:
     # site; a busy scene with heavy crossing traffic wants a smaller distance.
     reentry_seconds: float = 2.0
     reentry_distance: float = 0.06
+    # Frozen-stream detection (spec 8.1): a source that keeps delivering the
+    # same frame is stalled, not a static scene. Byte-identical frames for
+    # longer than this are treated as the camera going offline. 0 trips on the
+    # first repeat.
+    frozen_frame_seconds: float = 30.0
     # Rollup bucket width in stream-time seconds (spec 6.5). 15 minutes is the
     # usual foot-traffic granularity. A run shorter than one bucket produces a
     # single bucket.
@@ -75,6 +80,8 @@ class Config:
             raise ConfigError(f"reentry_seconds must be >= 0, got {self.reentry_seconds}")
         if self.reentry_distance < 0:
             raise ConfigError(f"reentry_distance must be >= 0, got {self.reentry_distance}")
+        if self.frozen_frame_seconds < 0:
+            raise ConfigError(f"frozen_frame_seconds must be >= 0, got {self.frozen_frame_seconds}")
         if self.bucket_seconds <= 0:
             raise ConfigError(f"bucket_seconds must be > 0, got {self.bucket_seconds}")
 
@@ -92,6 +99,7 @@ class Config:
             catchment_frac=_env_float("EDGE_CATCHMENT_FRAC", 0.08),
             reentry_seconds=_env_float("EDGE_REENTRY_SECONDS", 2.0),
             reentry_distance=_env_float("EDGE_REENTRY_DISTANCE", 0.06),
+            frozen_frame_seconds=_env_float("EDGE_FROZEN_FRAME_SECONDS", 30.0),
             bucket_seconds=_env_float("EDGE_BUCKET_SECONDS", 900.0),
             sqlite_path=os.getenv("EDGE_SQLITE_PATH", "./edge_local.db"),
             cloud_url=os.getenv("WHALETALE_CLOUD_URL", "https://api.whaletale.tech"),

@@ -10,13 +10,14 @@ a process per camera. True per-camera processes are a later optimisation.
 from __future__ import annotations
 
 import threading
+import time
 from collections import Counter
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Protocol
 
 from agent.aggregate import WallClockAggregator, WallClockBucket
-from agent.decode import DecodeError, decode_frames
+from agent.decode import DecodeError, FrozenFrameDetector, decode_frames
 from agent.detect import BBoxNorm, Frame
 from agent.siteconfig import CameraConfig, SiteConfig
 from agent.store import BucketStore, ObservationRecord, SiteTotalRecord
@@ -34,10 +35,13 @@ Clock = Callable[[], datetime]
 class _CameraWorker:
     """Decodes one source in a background thread, holding only the newest frame."""
 
-    def __init__(self, cam: CameraConfig, fps: float, clock: Clock) -> None:
+    def __init__(
+        self, cam: CameraConfig, fps: float, clock: Clock, *, frozen_after: float = 30.0
+    ) -> None:
         self.cam = cam
         self._fps = fps
         self._clock = clock
+        self._frozen = FrozenFrameDetector(frozen_after)
         self._lock = threading.Lock()
         self._latest: tuple[datetime, Frame] | None = None
         self._consumed_id = 0
@@ -52,6 +56,11 @@ class _CameraWorker:
     def _run(self) -> None:
         try:
             for _t, frame in decode_frames(self.cam.source, self._fps):
+                if self._frozen.check(frame, time.monotonic()):
+                    self.error = (
+                        f"frozen frame: source identical for {self._frozen.after_seconds:.0f}s"
+                    )
+                    break
                 with self._lock:
                     self._latest = (self._clock(), frame)
                     self._produced_id += 1
@@ -111,6 +120,7 @@ class MultiCameraPipeline:
         bucket_seconds: int = 900,
         reentry_seconds: float = 0.0,
         reentry_distance: float = 0.0,
+        frozen_frame_seconds: float = 30.0,
         clock: Clock | None = None,
     ) -> None:
         self.site = site
@@ -142,7 +152,10 @@ class MultiCameraPipeline:
                 )
                 self._runners.append(runner)
 
-        self._workers = [_CameraWorker(cam, fps, self._clock) for cam in site.cameras]
+        self._workers = [
+            _CameraWorker(cam, fps, self._clock, frozen_after=frozen_frame_seconds)
+            for cam in site.cameras
+        ]
         self._runners_by_cam: dict[str, list[_ZoneRunner]] = {}
         for r in self._runners:
             self._runners_by_cam.setdefault(r.camera_name, []).append(r)
