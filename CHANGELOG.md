@@ -31,6 +31,20 @@ One entry per milestone from the project spec, Section 14.
 - `whaletale_cloud/schedule.py`: per-day occupant resolution reusing the
   attribution tenancy rules.
 
+### M9: Billing
+- `whaletale_cloud/billing.py`: Stripe subscription per site, quantity = the
+  live `cameras` count recomputed server-side (never a client-sent price or
+  quantity). `preview_change` (the spec 8.5 change-preview), `apply_change`
+  (adds prorate now, removes defer to the next period), `handle_webhook`
+  (signature-verified: payment failed -> grace window -> read-only; paid ->
+  active; deleted -> cancel + export window).
+- `subscriptions` table + migration; `StripeGateway` protocol so tests inject a
+  fake.
+- Operator API: `GET/preview/apply .../billing`; `POST /webhooks/stripe`.
+  Operator writes return 402 once the grace window elapses; ingest and
+  heartbeats are never gated (spec 8.5, tested).
+- Console Settings: a billing panel with the preview -> confirm flow.
+
 ### M8: Fleet admin + alerts
 - `whaletale_cloud/fleet.py`: derives per-site health and the spec-9 alert
   conditions from heartbeats — camera dark > 1h (customer-facing, plain

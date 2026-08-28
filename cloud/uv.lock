@@ -905,6 +905,19 @@ wheels = [
 ]
 
 [[package]]
+name = "stripe"
+version = "15.6.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "requests" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/03/e7/1d33faefbd3752b17207ff57933ac677ed5538f83ff2ab38195adf18027a/stripe-15.6.0.tar.gz", hash = "sha256:0e6bb67863bc3d1d805394a6a12dd1aaedf638511f175ec4c3612e4dc8f952d0", size = 1562255, upload-time = "2026-08-27T04:10:43.613Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fb/28/aabe12c5440748a65c91e751a7ed038a41655343cd7e6d55b0640f76b2a1/stripe-15.6.0-py3-none-any.whl", hash = "sha256:6d668d25f863fc4ac73811f387a2dab27d3b8c344261c76c05cc61ba6b9edc09", size = 2217116, upload-time = "2026-08-27T04:10:41.248Z" },
+]
+
+[[package]]
 name = "testcontainers"
 version = "4.15.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1127,6 +1140,7 @@ dependencies = [
     { name = "sentry-sdk" },
     { name = "shapely" },
     { name = "sqlalchemy" },
+    { name = "stripe" },
     { name = "uvicorn", extra = ["standard"] },
     { name = "weasyprint" },
     { name = "whaletale-shared" },
@@ -1155,6 +1169,7 @@ requires-dist = [
     { name = "sentry-sdk", specifier = ">=2.18.0" },
     { name = "shapely", specifier = ">=2.0.6" },
     { name = "sqlalchemy", specifier = ">=2.0.36" },
+    { name = "stripe", specifier = ">=11.1.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32.0" },
     { name = "weasyprint", specifier = ">=63.0" },
     { name = "whaletale-shared", editable = "../shared" },

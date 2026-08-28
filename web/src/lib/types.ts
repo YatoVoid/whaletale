@@ -120,3 +120,23 @@ export type EdgeBox = {
   last_seen_at: string | null;
   created_at: string;
 };
+
+export type BillingStatus = {
+  status: string;
+  camera_quantity: number;
+  billed_cameras: number;
+  current_period_end: string | null;
+  grace_until: string | null;
+  read_only: boolean;
+  export_ready_at: string | null;
+};
+
+export type ChangePreview = {
+  current_cameras: number;
+  new_cameras: number;
+  prorated_amount_cents: number;
+  currency: string;
+  next_invoice_total_cents: number;
+  effective: string;
+  lines: string[];
+};

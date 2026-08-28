@@ -1,6 +1,7 @@
 import { api } from "@/lib/api";
 import { auth } from "@/lib/auth";
-import type { Camera, EdgeBox, Site } from "@/lib/types";
+import type { BillingStatus, Camera, EdgeBox, Site } from "@/lib/types";
+import { BillingPanel } from "./billing-panel";
 import { Cameras, EdgeBoxes } from "./onboarding-panels";
 
 export const dynamic = "force-dynamic";
@@ -11,10 +12,12 @@ export default async function SettingsPage() {
 
   let cameras: Camera[] = [];
   let boxes: EdgeBox[] = [];
+  let billing: BillingStatus | null = null;
   if (siteId) {
-    [cameras, boxes] = await Promise.all([
+    [cameras, boxes, billing] = await Promise.all([
       api<Camera[]>(`/v1/sites/${siteId}/cameras`).catch(() => []),
       api<EdgeBox[]>(`/v1/sites/${siteId}/edge-boxes`).catch(() => []),
+      api<BillingStatus>(`/v1/sites/${siteId}/billing`).catch(() => null),
     ]);
   }
 
@@ -44,6 +47,7 @@ export default async function SettingsPage() {
         <>
           <EdgeBoxes siteId={siteId} boxes={boxes} />
           <Cameras siteId={siteId} cameras={cameras} />
+          {billing && <BillingPanel siteId={siteId} status={billing} />}
         </>
       )}
 

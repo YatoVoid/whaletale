@@ -358,3 +358,29 @@ class Alert(Base):
             postgresql_where=text("resolved_at IS NULL"),
         ),
     )
+
+
+class Subscription(Base):
+    """One Stripe subscription per site, billed on camera count (spec 8.5, 12).
+    Camera quantity is derived from `cameras` rows server-side, never trusted
+    from the client. Added with M9."""
+
+    __tablename__ = "subscriptions"
+
+    id: Mapped[UUID] = _pk()
+    site_id: Mapped[UUID] = mapped_column(ForeignKey("sites.id", ondelete="RESTRICT"))
+    stripe_customer_id: Mapped[str] = mapped_column(String(64))
+    stripe_subscription_id: Mapped[str] = mapped_column(String(64))
+    stripe_price_id: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(24))  # active | past_due | canceled | trialing
+    camera_quantity: Mapped[int] = mapped_column()
+    current_period_end: Mapped[datetime | None] = _utc()
+    grace_until: Mapped[datetime | None] = _utc()  # set on payment failure
+    canceled_at: Mapped[datetime | None] = _utc()
+    export_ready_at: Mapped[datetime | None] = _utc()  # cancel -> export, then delete
+    updated_at: Mapped[datetime] = _utc(server_default=text("now()"))
+
+    __table_args__ = (
+        UniqueConstraint("site_id", name="one_subscription_per_site"),
+        UniqueConstraint("stripe_subscription_id"),
+    )

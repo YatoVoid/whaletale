@@ -49,6 +49,7 @@ Before adding any vision dependency, check its license and add a row here.
 | ASGI toolkit / server (M5) | `starlette`, `uvicorn` (+ `uvloop`, `httptools`, `websockets`, `watchfiles`) | BSD-3-Clause / MIT | 2026-08-28 |
 | HTTP client, test transport (M5) | `httpx` (+ `anyio`, `h11`) | BSD-3-Clause / MIT | 2026-08-28 |
 | Error tracking (M8) | `sentry-sdk` | MIT | 2026-08-28 |
+| Billing (M9) | `stripe` | MIT | 2026-08-28 |
 
 `psycopg` is LGPL-3.0. Same standing as FFmpeg (Section 3): the library is
 imported unmodified and runs server-side, never distributed to a user, so the
