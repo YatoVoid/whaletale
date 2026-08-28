@@ -1,8 +1,9 @@
 # Metrics
 
 These definitions are canonical. The operator console links every metric label to
-this file. Do not redefine any of these anywhere else in the codebase or UI;
-import the constants and helpers from `shared/` once they exist.
+this file. Do not redefine any of these anywhere else in the codebase or UI.
+Shared types live in `shared/schemas/`; the cloud computes the metrics in
+`cloud/whaletale_cloud/metrics.py` and normalization in `normalization.py`.
 
 ## Definitions (spec Section 6.4)
 
@@ -54,5 +55,22 @@ where `min_dwell` is met, a dwell to where the track leaves or the run ends, a
 passerby to where the track is dropped). Track identity is continuous across
 boundaries.
 
-Traffic share and normalization need site-wide totals and a trailing baseline,
-so they arrive with the cloud schema.
+The cloud (M2) computes the same metrics over synced 15-minute `observations`,
+joined to `tenancies` at query time so a schedule fixed weeks late corrects all
+history (spec 5.2.1). Each bucket is resolved against the zone version effective
+then (spec 5.2.2); a bucket the primary version is missing falls back to a
+non-primary version and is marked `degraded` (spec 6.6). Normalization does all
+three comparisons; the trailing-weeks shift is done in the site timezone so a
+DST boundary does not misalign "10am Saturday" (spec 5.2.5).
+
+Two metrics are not fully reconstructable in the cloud from the 5.1 schema and
+are handled honestly rather than faked:
+
+- **Person-seconds** has no `observations` column, so it is not reported at the
+  cloud. The edge computes it but does not sync it.
+- **Dwell** is stored per bucket as p50/p90. A true period percentile needs the
+  per-track samples, which are not synced, so the period figure is the
+  entries-weighted mean of the bucket percentiles, labelled `_est`.
+
+`capture_events` is the stored numerator for capture rate; the edge sets it
+equal to `entries`, so the reported rate matches the 6.4 formula.

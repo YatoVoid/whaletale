@@ -1,0 +1,73 @@
+[project]
+name = "whaletale-cloud"
+version = "0.2.0"
+description = "WhaleTale cloud: schema, attribution join, metrics, normalization"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "whaletale-shared",
+    "sqlalchemy>=2.0.36",
+    "alembic>=1.14.0",
+    "psycopg[binary]>=3.2.3",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6.0",
+    "python-dateutil>=2.9.0",
+    "shapely>=2.0.6",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.8.6",
+    "mypy>=1.14.0",
+    "testcontainers[postgres]>=4.9.0",
+    "types-python-dateutil>=2.9.0",
+]
+
+[tool.uv]
+package = true
+
+[tool.uv.sources]
+whaletale-shared = { path = "../shared", editable = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["whaletale_cloud"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+# Alembic autogenerates these; long DDL lines and its own import order are fine.
+"migrations/versions/*" = ["E501", "I001"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["schemas", "whaletale_cloud"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["whaletale_cloud", "tests", "migrations"]
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = "testcontainers.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "shapely.*"
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+# db.py is the runtime engine/session singleton, exercised by the app, not units.
+omit = ["tests/*", "migrations/*", "whaletale_cloud/db.py"]

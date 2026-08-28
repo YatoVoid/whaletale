@@ -1,0 +1,28 @@
+# Local Postgres + Redis for cloud development and tests.
+#   docker compose -f docker/compose.cloud.yml up -d
+# Point tests at it with WHALETALE_TEST_DATABASE_URL, e.g.
+#   postgresql+psycopg://whaletale:whaletale@localhost:5432/whaletale
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: whaletale
+      POSTGRES_PASSWORD: whaletale
+      POSTGRES_DB: whaletale
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U whaletale"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  pgdata:

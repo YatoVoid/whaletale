@@ -18,6 +18,19 @@ Local dev only, no deployment, no alerts. Failure modes seen while running
 | Entry count looks inflated | Track ID churn from occlusion; no re-entry grace window yet | Known M1 limitation. Re-entry merge (spec 8.2) lands in M4. |
 | Zero entries but people are visible | Polygon doesn't cover where people walk | Adjust the normalized points in `edge/agent/zones.py`. Live overlay editor is M6. |
 
+## M2: schema and attribution
+
+Cloud schema, seed, and the attribution/metrics/normalization logic. No
+deployment, no live sync yet (that is M5). Failure modes while developing:
+
+| Symptom | Cause | Action |
+|---|---|---|
+| `alembic check` fails in CI with a diff | A model was changed without generating a migration | `cd cloud && uv run alembic revision --autogenerate -m "..."`, review the file, `ruff format` it, commit. |
+| Tests error with `could not connect` / `Connection refused` | No Postgres | `docker compose -f docker/compose.cloud.yml up -d`, or set `WHALETALE_TEST_DATABASE_URL`. Without either, tests start a throwaway container and need Docker. |
+| Attribution shows a bucket as `VACANT` unexpectedly | No tenancy covers that bucket, or a recurring tenancy's RRULE / daily window excludes it, or a `closure` day annotation suppressed it | Check `tenancies` for the space and the `day_annotations` for that date. Vacancy is real information, not an error (spec 8.3). |
+| A report period looks wrong across a DST change | Bucket alignment done in UTC instead of site-local | Buckets are aligned in `sites.timezone` then stored UTC (spec 5.2.5). Confirm the site timezone is a valid IANA name. |
+| `IntegrityError` on a second primary zone version | Two open primary versions for one space | Close the old one (`effective_to = now`) before inserting the new (spec 5.2.2, 6.6). |
+
 ## Later milestones
 
 Filled in as each merges. Cloud/site alerting starts at M8.

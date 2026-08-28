@@ -28,6 +28,23 @@ Before adding any vision dependency, check its license and add a row here.
 | Numerics | `numpy` | BSD-3-Clause | 2026-08-27 |
 | Imaging | `pillow` | MIT-CMU | 2026-08-27 |
 
+## Approved and in use — cloud (M2)
+
+| Purpose | Package | License | Checked |
+|---|---|---|---|
+| ORM | `sqlalchemy` | MIT | 2026-08-27 |
+| Migrations | `alembic` (+ `mako`) | MIT | 2026-08-27 |
+| Postgres driver | `psycopg` / `psycopg-binary` | LGPL-3.0-only | 2026-08-27 |
+| Schemas | `pydantic`, `pydantic-settings` | MIT | 2026-08-27 |
+| Recurrence (RRULE) | `python-dateutil` | BSD-3-Clause / Apache-2.0 (dual) | 2026-08-27 |
+| Polygon geometry | `shapely` | BSD-3-Clause | 2026-08-27 |
+| Test Postgres (dev) | `testcontainers` | Apache-2.0 | 2026-08-27 |
+
+`psycopg` is LGPL-3.0. Same standing as FFmpeg (Section 3): the library is
+imported unmodified and runs server-side, never distributed to a user, so the
+LGPL relink obligation is not triggered. The license audit allows LGPL; it fails
+only on AGPL/GPL.
+
 ## Transitive, reviewed
 
 | Package | Via | License | Note |
@@ -45,6 +62,7 @@ Before adding any vision dependency, check its license and add a row here.
 
 - `supervision` (MIT): polygon annotation / line-crossing overlay. Not needed
   for M1 (geometry is `shapely`); lands with the M6 zone editor overlay.
+- FastAPI, `arq` / Celery + Redis, WeasyPrint or Playwright (M3/M5).
 - RT-DETR/YOLOX ONNX export, ONNX Runtime or TensorRT (M4).
 - `onvif-zeep` / `WSDiscovery` (M7).
 
