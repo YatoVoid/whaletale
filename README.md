@@ -60,6 +60,7 @@ polygons with their cloud `zone_version_id`; never committed - see
 cd edge
 cp site.example.json site.json          # then edit for the real site
 uv run whaletale-agent --config site.json --seconds 120
+uv run whaletale-agent --config site.json --recalibrate  # re-capture drift references after moving a camera
 uv run whaletale-sync  --config site.json --dry-run    # show the buffered backlog
 uv run whaletale-sync  --config site.json --once       # ship it (needs a cloud from M5)
 ```

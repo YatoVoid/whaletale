@@ -40,6 +40,9 @@ site.json
 *.sqlite3
 *.sql.gz
 
+# --- Edge per-install local state ---
+refframes/
+
 # --- Model weights / caches (never in git, see docs/licenses.md) ---
 models/
 .hf_cache/

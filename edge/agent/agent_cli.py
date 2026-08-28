@@ -3,6 +3,7 @@
     whaletale-agent --config site.json          # run until Ctrl-C / SIGTERM
     whaletale-agent --config site.json --seconds 60
     whaletale-agent --config site.json --warm    # load the model and exit
+    whaletale-agent --config site.json --recalibrate  # re-capture drift references and exit
 
 Writes 15-minute rollups to the local SQLite buffer (`EDGE_SQLITE_PATH`); the
 sync client (`whaletale-sync`) ships them.
@@ -14,12 +15,35 @@ import argparse
 import signal
 import sys
 import time
+from pathlib import Path
 from types import FrameType
 
 from agent import __version__
 from agent.config import Config, ConfigError
 from agent.siteconfig import SiteConfigError, load_site_config
 from agent.store import BucketStore, IntegrityError
+
+
+def _ref_dir(cfg: Config, sqlite_path: str) -> str:
+    return cfg.ref_dir or str(Path(sqlite_path).resolve().parent / "refframes")
+
+
+def _recalibrate(cfg: Config, site: object, sqlite_path: str) -> int:
+    from agent.calibration import RefStore, dhash
+    from agent.decode import DecodeError, decode_frames
+
+    store = RefStore(_ref_dir(cfg, sqlite_path))
+    failed = False
+    for cam in site.cameras:  # type: ignore[attr-defined]
+        try:
+            _t, frame = next(iter(decode_frames(cam.source, cfg.target_fps)))
+        except (DecodeError, StopIteration) as exc:
+            print(f"camera {cam.name}: could not grab a frame ({exc})", file=sys.stderr)
+            failed = True
+            continue
+        store.set(cam.name, dhash(frame))
+        print(f"camera {cam.name}: reference captured")
+    return 1 if failed else 0
 
 
 def _fail(msg: str) -> int:
@@ -36,6 +60,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--model", default=None)
     p.add_argument("--seconds", type=float, default=0.0, help="stop after N seconds (0 = forever)")
     p.add_argument("--warm", action="store_true", help="load the model and exit")
+    p.add_argument(
+        "--recalibrate",
+        action="store_true",
+        help="re-capture the per-camera drift reference frames and exit",
+    )
     args = p.parse_args(argv)
 
     try:
@@ -52,6 +81,10 @@ def main(argv: list[str] | None = None) -> int:
         site = load_site_config(args.config)
     except SiteConfigError as exc:
         return _fail(str(exc))
+
+    sqlite_path = args.sqlite or cfg.sqlite_path
+    if args.recalibrate:
+        return _recalibrate(cfg, site, sqlite_path)
 
     from agent.detect import PersonDetector
 
@@ -77,7 +110,7 @@ def main(argv: list[str] | None = None) -> int:
     from agent.pipeline import MultiCameraPipeline
 
     try:
-        store = BucketStore(args.sqlite or cfg.sqlite_path)
+        store = BucketStore(sqlite_path)
     except IntegrityError as exc:
         return _fail_1(str(exc))
 
@@ -93,6 +126,10 @@ def main(argv: list[str] | None = None) -> int:
         reentry_seconds=cfg.reentry_seconds,
         reentry_distance=cfg.reentry_distance,
         frozen_frame_seconds=cfg.frozen_frame_seconds,
+        ref_dir=_ref_dir(cfg, sqlite_path),
+        recalibration_check_seconds=cfg.recalibration_check_seconds,
+        drift_hamming_threshold=cfg.drift_hamming_threshold,
+        drift_samples=cfg.drift_samples,
     )
 
     stop_at = time.monotonic() + args.seconds if args.seconds else None

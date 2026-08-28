@@ -104,6 +104,28 @@ def test_camera_dark_alerts_the_customer_in_plain_language(clean_db: Session) ->
     assert "power" in a.message
 
 
+def test_camera_moved_alerts_the_customer(clean_db: Session) -> None:
+    site, box = _site_box(clean_db, box_seen=NOW, agent="0.9.0")
+    _hb(
+        clean_db,
+        box,
+        site,
+        per_camera=[
+            {
+                "id": "cam-2",
+                "status": "needs_recalibration",
+                "last_frame_at": NOW.isoformat(),
+            }
+        ],
+    )
+    [sh] = evaluate_fleet(clean_db, now=NOW, config=CFG)
+    a = next(a for a in sh.alerts if a.kind == "camera_moved")
+    assert a.audience == "customer"
+    assert "moved" in a.message and "calibration" in a.message
+    # a moved camera is not also reported as a confidence drop
+    assert not any(al.kind == "low_confidence" and al.subject == "cam-2" for al in sh.alerts)
+
+
 def test_confidence_drop_from_baseline(clean_db: Session) -> None:
     site, box = _site_box(clean_db, box_seen=NOW, agent="0.9.0")
     for i in range(5):  # baseline ~0.80

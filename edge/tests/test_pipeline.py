@@ -97,6 +97,51 @@ def test_frozen_stream_surfaces_a_worker_error(tmp_path: Path) -> None:
     store.close()
 
 
+def _moving_stripe_clip(path: Path, n_frames: int) -> None:
+    container = av.open(str(path), "w")
+    stream = container.add_stream("rawvideo", rate=15)
+    stream.width, stream.height, stream.pix_fmt = 64, 48, "rgb24"
+    for i in range(n_frames):
+        arr = np.zeros((48, 64, 3), dtype=np.uint8)
+        x = 2 + (i * 3) % 48  # a vertical bar that sweeps across the frame
+        arr[:, x : x + 10] = 220
+        for pkt in stream.encode(av.VideoFrame.from_ndarray(arr, format="rgb24")):
+            container.mux(pkt)
+    for pkt in stream.encode():
+        container.mux(pkt)
+    container.close()
+
+
+def test_camera_drift_flags_and_pauses_counting(tmp_path: Path) -> None:
+    # spec 8.1: the view drifts away from the reference captured on the first
+    # check, so the camera is flagged and counting stops.
+    clip = tmp_path / "drift.nut"
+    _moving_stripe_clip(clip, n_frames=120)
+
+    store = BucketStore(tmp_path / "edge.db")
+    pipeline = MultiCameraPipeline(
+        _config(clip, clip),  # type: ignore[arg-type]
+        _AlwaysOnePerson(),
+        store,
+        fps=4.0,
+        min_dwell_seconds=0.0,
+        bucket_seconds=5,
+        ref_dir=str(tmp_path / "ref"),
+        recalibration_check_seconds=0.0,  # check every tick
+        drift_hamming_threshold=8,
+        drift_samples=1,
+        clock=_FakeClock(datetime(2026, 6, 1, 12, 0, tzinfo=UTC)),
+    )
+    pipeline.run(stop=lambda: False)
+    pipeline.close()
+
+    health = {h["id"]: h for h in store.camera_health()}
+    assert health["cam-a"]["status"] == "needs_recalibration"
+    assert not pipeline.worker_errors  # drift is not a decode error
+    assert (tmp_path / "ref" / "cam-a.json").exists()  # reference was captured
+    store.close()
+
+
 def test_two_cameras_write_observations_and_a_site_total(tmp_path: Path) -> None:
     clip_a, clip_b = tmp_path / "a.mp4", tmp_path / "b.mp4"
     _write_clip(clip_a, n_frames=90, rate=15)  # 6 s

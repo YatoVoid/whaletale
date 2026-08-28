@@ -217,6 +217,22 @@ def _box_alerts(
                 )
             )
             continue
+        if cam.get("status") == "needs_recalibration":
+            alerts.append(
+                Alert(
+                    kind="camera_moved",
+                    severity="critical",
+                    audience="customer",
+                    subject=name,
+                    message=(
+                        f"Camera {name} looks like it moved or was re-aimed. Counts for it "
+                        "are paused. Check its view, then re-run calibration."
+                    ),
+                    site_id=site.id,
+                    edge_box_id=box.id,
+                )
+            )
+            continue
         mc = cam.get("mean_confidence")
         base = baseline.get(name)
         if isinstance(mc, int | float) and base and mc < base * (1 - cfg.confidence_drop):
