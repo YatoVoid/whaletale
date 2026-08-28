@@ -151,6 +151,38 @@ def test_reshape_zone_creates_a_new_version(op: dict[str, Any]) -> None:
         assert sum(1 for v in versions if v.effective_to is None) == 1
 
 
+def test_current_zone_returns_the_open_primary(op: dict[str, Any]) -> None:
+    space_id = op["res"].space_ids["stall-1"]
+    r = _get(op, f"/v1/spaces/{space_id}/zone-versions/current")
+    assert r.status_code == 200, r.text
+    cur = r.json()
+    assert cur["version_number"] == 1
+    assert len(cur["polygon"]) >= 3
+
+
+def test_reshape_conflicts_when_base_version_is_stale(op: dict[str, Any]) -> None:
+    # spec 8.4: two operators edit the same zone. The second save carries the
+    # id it loaded, which the first save already superseded.
+    space_id = op["res"].space_ids["stall-1"]
+    stale = _get(op, f"/v1/spaces/{space_id}/zone-versions/current").json()["zone_version_id"]
+    poly = [[0.2, 0.3], [0.8, 0.3], [0.8, 0.9], [0.2, 0.9]]
+
+    first = _post(
+        op,
+        f"/v1/spaces/{space_id}/zone-versions/reshape",
+        {"polygon": poly, "created_by": "a@example.test", "base_version_id": stale},
+    )
+    assert first.status_code == 201, first.text
+
+    second = _post(
+        op,
+        f"/v1/spaces/{space_id}/zone-versions/reshape",
+        {"polygon": poly, "created_by": "b@example.test", "base_version_id": stale},
+    )
+    assert second.status_code == 409
+    assert "changed since you opened it" in second.json()["detail"]
+
+
 def test_reshape_rejects_a_self_intersecting_polygon(op: dict[str, Any]) -> None:
     space_id = op["res"].space_ids["stall-1"]
     body = {

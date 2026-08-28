@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { auth } from "@/lib/auth";
-import type { SpaceDetail } from "@/lib/types";
+import type { CurrentZone, SpaceDetail } from "@/lib/types";
 import { ZoneEditor } from "./zone-editor";
 
 export const dynamic = "force-dynamic";
@@ -21,11 +21,19 @@ export default async function ZonePage({
   }
   const email = (await auth())?.user?.email ?? "operator";
 
+  let current: CurrentZone | null = null;
+  try {
+    current = await api<CurrentZone>(`/v1/spaces/${id}/zone-versions/current`);
+  } catch (e) {
+    if (!(e instanceof ApiError && e.status === 404)) throw e;
+  }
+
   return (
     <ZoneEditor
       spaceId={id}
       spaceName={detail.space.name}
-      initial={[]}
+      initial={current?.polygon ?? []}
+      baseVersionId={current?.zone_version_id ?? null}
       createdBy={email}
     />
   );

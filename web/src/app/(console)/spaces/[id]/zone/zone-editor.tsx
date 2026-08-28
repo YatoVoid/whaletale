@@ -13,11 +13,13 @@ export function ZoneEditor({
   spaceId,
   spaceName,
   initial,
+  baseVersionId,
   createdBy,
 }: {
   spaceId: string;
   spaceName: string;
   initial: Pt[];
+  baseVersionId: string | null;
   createdBy: string;
 }) {
   const router = useRouter();
@@ -113,7 +115,7 @@ export function ZoneEditor({
   async function save() {
     setSaving(true);
     setResult(null);
-    const r = await saveZone(spaceId, pts, createdBy);
+    const r = await saveZone(spaceId, pts, createdBy, baseVersionId);
     setSaving(false);
     setResult(r);
     if (r.ok) setTimeout(() => router.push(`/spaces/${spaceId}`), 1400);

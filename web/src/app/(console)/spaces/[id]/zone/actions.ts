@@ -12,6 +12,7 @@ export async function saveZone(
   spaceId: string,
   polygon: [number, number][],
   createdBy: string,
+  baseVersionId: string | null,
 ): Promise<SaveZoneResult> {
   if (polygon.length < 3) {
     return { ok: false, error: "A zone needs at least three points." };
@@ -19,7 +20,7 @@ export async function saveZone(
   try {
     const out = await api<ReshapeOut>(`/v1/spaces/${spaceId}/zone-versions/reshape`, {
       method: "POST",
-      body: { polygon, created_by: createdBy },
+      body: { polygon, created_by: createdBy, base_version_id: baseVersionId },
     });
     revalidatePath(`/spaces/${spaceId}`);
     return { ok: true, message: out.message, versionNumber: out.version_number };

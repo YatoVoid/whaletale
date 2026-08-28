@@ -139,6 +139,15 @@ def test_oversized_body_is_413(api_client: Any, paired: dict[str, Any]) -> None:
     assert r.status_code == 413
 
 
+def test_security_headers_present_on_every_response(api_client: Any) -> None:
+    r = api_client.get("/healthz")
+    assert r.status_code == 200
+    assert r.headers["strict-transport-security"].startswith("max-age=")
+    assert r.headers["x-content-type-options"] == "nosniff"
+    assert r.headers["x-frame-options"] == "DENY"
+    assert "frame-ancestors 'none'" in r.headers["content-security-policy"]
+
+
 def test_rate_limit_returns_429(api_client: Any, paired: dict[str, Any]) -> None:
     api_client.app.state.rate_limiter.limit = 3
     body = {"schema_version": 1, "site_id": paired["site_id"], "observations": []}
