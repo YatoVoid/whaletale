@@ -12,10 +12,10 @@ a named refinement is not), **deferred** (not built, tracked below).
 | Case | Status | Where / test |
 |---|---|---|
 | Camera offline mid-bucket, mark partial, record `active_cameras`, no extrapolation | done | `pipeline.py` writes `active_cameras` per site-total from the set of cameras that produced a bucket; `test_wire_contract.test_edge_site_total_row_parses`, `test_admin_api.test_fleet_reports_state_and_alerts` |
-| Camera clock drift, reject frames > 60s from local time | deferred | See below. NTP sync is a deploy concern (`docs/runbook.md`); the in-agent reject is not built. |
+| Camera clock drift, reject frames > 60s from local time | not applicable | The agent stamps each frame with the box wall clock (`_CameraWorker`), never the camera's own timestamp, so a drifted camera clock cannot reach a bucket. Box-clock NTP is a deploy concern (`docs/runbook.md`). There is nothing to reject. |
 | Camera moved / re-aimed, perceptual hash vs hourly reference, flag `needs_recalibration`, stop counting | deferred | See below. |
 | Resolution / aspect ratio change, normalized polygons survive, flag for review | partial | Polygons are normalized end to end (`zones.py`, `test_zones.test_parse_zone_variants`); the review flag is not emitted. |
-| Frozen frame (identical consecutive frames > 30s), treat as offline | deferred | `decode.py` reconnect covers a hard stall (no new frames); a source still delivering one frozen image is not caught yet. |
+| Frozen frame (identical consecutive frames > 30s), treat as offline | done | `decode.FrozenFrameDetector`, wired into `_CameraWorker`; a stalled source sets a `frozen frame` worker error like a decode failure. `EDGE_FROZEN_FRAME_SECONDS` (default 30). `test_decode.test_frozen_frame_detector_*`, `test_pipeline.test_frozen_stream_surfaces_a_worker_error` |
 | RTSP credentials rotated, specific operator-facing message | partial | `DecodeError` surfaces the underlying error string (`test_decode.test_file_decode_failure_is_fatal`); it is not classified as an auth failure with dedicated copy. |
 | Night mode / IR switch, per-camera confidence baseline, flag `low_confidence` | partial | Cloud side is built and tested: `fleet._confidence_baseline`, `FleetConfig.confidence_drop`, `test_fleet.test_confidence_drop_from_baseline`. The edge does not yet stamp `low_confidence` on individual observation rows, and the agent does not populate per-camera `mean_confidence` in the heartbeat. |
 | Direct sun / blown highlights, same mechanism | partial | Same as above. |
@@ -75,29 +75,22 @@ These need a schema or product decision beyond a hardening pass, or edge-only
 work with a captured-frame constraint. None block the pilot; each is a known
 gap.
 
-1. **Camera clock-drift reject (§8.1).** Add a check in the agent that drops a
-   frame whose capture time is more than 60s from the box clock, and counts the
-   drops toward a `clock_drift` heartbeat signal. Deploy-side NTP is the primary
-   defense and is documented in the runbook.
-2. **Perceptual-hash recalibration (§8.1).** Sample a reference frame hourly,
+1. **Perceptual-hash recalibration (§8.1).** Sample a reference frame hourly,
    hash it, and when the hash diverges past a threshold flag the camera
    `needs_recalibration` and stop counting. The reference frame and hash never
    leave the box.
-3. **Frozen-frame detection (§8.1).** Hash consecutive decoded frames; if they
-   are identical for more than 30s, treat the source as offline even though the
-   socket is open.
-4. **Per-camera confidence on the edge (§8.1).** The agent should track a
+2. **Per-camera confidence on the edge (§8.1).** The agent should track a
    rolling mean detection confidence per camera, put it in the heartbeat
    `per_camera` block, and stamp `low_confidence` on observation rows when it
    drops sharply. The cloud already consumes this signal once it arrives.
-5. **Excluded zones and staff-hours filter (§8.2).** An `excluded` space kind
+3. **Excluded zones and staff-hours filter (§8.2).** An `excluded` space kind
    that the counter subtracts, plus a reporting toggle that drops configured
    staff-hour windows.
-6. **Glass-reflection sub-region exclusion (§8.2).** Let the operator mark
+4. **Glass-reflection sub-region exclusion (§8.2).** Let the operator mark
    holes inside a zone polygon that do not count.
-7. **Operating hours per site (§8.2).** Store open/close per weekday and skip
+5. **Operating hours per site (§8.2).** Store open/close per weekday and skip
    bucket emission outside them rather than relying on "no activity, no bucket".
-8. **Parent/child confirmation for overlapping zones (§8.3).** When two zones on
+6. **Parent/child confirmation for overlapping zones (§8.3).** When two zones on
    one camera overlap, warn and require the operator to set the parent/child
    relation before saving.
 

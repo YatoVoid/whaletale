@@ -64,6 +64,38 @@ def _config(clip_a: Path, clip_b: Path) -> object:
     )
 
 
+def test_frozen_stream_surfaces_a_worker_error(tmp_path: Path) -> None:
+    # spec 8.1: a source that keeps delivering the same frame is offline.
+    clip = tmp_path / "frozen.nut"
+    container = av.open(str(clip), "w")
+    stream = container.add_stream("rawvideo", rate=15)  # lossless: decoded frames are exact
+    stream.width, stream.height, stream.pix_fmt = 64, 48, "rgb24"
+    still = np.full((48, 64, 3), 120, dtype=np.uint8)
+    for _ in range(60):
+        for pkt in stream.encode(av.VideoFrame.from_ndarray(still, format="rgb24")):
+            container.mux(pkt)
+    for pkt in stream.encode():
+        container.mux(pkt)
+    container.close()
+
+    store = BucketStore(tmp_path / "edge.db")
+    pipeline = MultiCameraPipeline(
+        _config(clip, clip),  # type: ignore[arg-type]
+        _AlwaysOnePerson(),
+        store,
+        fps=4.0,
+        min_dwell_seconds=0.0,
+        bucket_seconds=5,
+        frozen_frame_seconds=0.0,  # trip on the first repeated frame
+        clock=_FakeClock(datetime(2026, 6, 1, 12, 0, tzinfo=UTC)),
+    )
+    pipeline.run(stop=lambda: False)
+    pipeline.close()
+
+    assert any("frozen frame" in e for e in pipeline.worker_errors.values())
+    store.close()
+
+
 def test_two_cameras_write_observations_and_a_site_total(tmp_path: Path) -> None:
     clip_a, clip_b = tmp_path / "a.mp4", tmp_path / "b.mp4"
     _write_clip(clip_a, n_frames=90, rate=15)  # 6 s

@@ -17,6 +17,31 @@ class DecodeError(RuntimeError):
     """A source could not be opened, or a non-live source failed mid-decode."""
 
 
+class FrozenFrameDetector:
+    """spec 8.1: a stream can stall without disconnecting. Byte-identical
+    consecutive frames for longer than `after_seconds` mean the source is
+    frozen and should be treated as offline, not as a static scene."""
+
+    def __init__(self, after_seconds: float = 30.0) -> None:
+        self.after_seconds = after_seconds
+        self._prev: Frame | None = None
+        self._since: float | None = None
+
+    def check(self, frame: Frame, now: float) -> bool:
+        """True once the stream has been frozen past the threshold."""
+        if (
+            self._prev is not None
+            and self._prev.shape == frame.shape
+            and np.array_equal(self._prev, frame)
+        ):
+            if self._since is None:
+                self._since = now
+            return now - self._since >= self.after_seconds
+        self._prev = frame
+        self._since = None
+        return False
+
+
 def is_live_source(source: str) -> bool:
     """A webcam index or a network stream. These are expected to drop and recover;
     a file is not, so a file decode error is fatal."""
