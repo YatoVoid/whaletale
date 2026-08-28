@@ -77,8 +77,19 @@ only as a SHA-256. Still no central alerting on the telemetry - that is M8.
 
 The operator-facing REST API (`/v1/sites`, `/v1/spaces/{id}`, `/v1/sites/{id}/schedule`,
 `/v1/sites/{id}/overview`, tenancy and zone-reshape writes). Auth is a hashed
-bearer token per `operator_user`, scoped to that user's sites. The Next.js
-console (Auth.js login, the screens) is the remaining M6 work.
+bearer token per `operator_user`, scoped to that user's sites.
+
+The Next.js console (`web/`) is being built screen by screen: Overview,
+Schedule, Space detail, Spaces list, and Occupants ship first; the zone editor,
+Reports, and Settings screens follow. Sign-in is email + operator token
+(`create_operator_user` on the cloud) until a password flow lands.
+
+| Symptom | Cause | Action |
+|---|---|---|
+| Console shows "not linked to a site" | the signed-in `operator_user` has no `operator_user_sites` row | Link it (Settings screen will do this; for now insert directly). |
+| Schedule cell assignment fails with "already has an overlapping tenancy" | conflict detected on save | The message is from the API; the operator removes or edits the other tenancy first (spec 8.3). |
+| Report PDF link 502s | the cloud report render failed or WeasyPrint libs missing on the API host | Check the API's `journalctl`; `libpango-1.0-0 libpangoft2-1.0-0` must be present. |
+| Fonts fall back to a serif/sans on first load | `next/font` self-hosts IBM Plex at build; a stale build serves none | Rebuild the web app. |
 
 | Symptom | Cause | Action |
 |---|---|---|
