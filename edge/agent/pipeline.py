@@ -109,6 +109,8 @@ class MultiCameraPipeline:
         exit_margin: float = 0.02,
         catchment_margin: float = 0.08,
         bucket_seconds: int = 900,
+        reentry_seconds: float = 0.0,
+        reentry_distance: float = 0.0,
         clock: Clock | None = None,
     ) -> None:
         self.site = site
@@ -134,6 +136,8 @@ class MultiCameraPipeline:
                         self._make_on_bucket(cam.name, zc.zone_version_id),
                         min_dwell_seconds=min_dwell_seconds,
                         bucket_seconds=bucket_seconds,
+                        reentry_seconds=reentry_seconds,
+                        reentry_distance=reentry_distance,
                     ),
                 )
                 self._runners.append(runner)

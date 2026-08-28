@@ -41,6 +41,13 @@ class Config:
     # stand-in for the spec's "2 m equivalent" until ground-plane calibration;
     # tune per camera.
     catchment_frac: float = 0.08
+    # Re-entry grace window (spec 8.2): an occluded person reappears under a new
+    # track id, which would read as a second entry. A fresh track starting
+    # within this many seconds and this normalized distance of a just-dropped
+    # track inherits its visit instead. 0 on either disables merging. Tune per
+    # site; a busy scene with heavy crossing traffic wants a smaller distance.
+    reentry_seconds: float = 2.0
+    reentry_distance: float = 0.06
     # Rollup bucket width in stream-time seconds (spec 6.5). 15 minutes is the
     # usual foot-traffic granularity. A run shorter than one bucket produces a
     # single bucket.
@@ -64,6 +71,10 @@ class Config:
             raise ConfigError(f"exit_margin_frac must be >= 0, got {self.exit_margin_frac}")
         if self.catchment_frac < 0:
             raise ConfigError(f"catchment_frac must be >= 0, got {self.catchment_frac}")
+        if self.reentry_seconds < 0:
+            raise ConfigError(f"reentry_seconds must be >= 0, got {self.reentry_seconds}")
+        if self.reentry_distance < 0:
+            raise ConfigError(f"reentry_distance must be >= 0, got {self.reentry_distance}")
         if self.bucket_seconds <= 0:
             raise ConfigError(f"bucket_seconds must be > 0, got {self.bucket_seconds}")
 
@@ -79,6 +90,8 @@ class Config:
             min_dwell_seconds=_env_float("EDGE_MIN_DWELL_SECONDS", 3.0),
             exit_margin_frac=_env_float("EDGE_EXIT_MARGIN_FRAC", 0.02),
             catchment_frac=_env_float("EDGE_CATCHMENT_FRAC", 0.08),
+            reentry_seconds=_env_float("EDGE_REENTRY_SECONDS", 2.0),
+            reentry_distance=_env_float("EDGE_REENTRY_DISTANCE", 0.06),
             bucket_seconds=_env_float("EDGE_BUCKET_SECONDS", 900.0),
             sqlite_path=os.getenv("EDGE_SQLITE_PATH", "./edge_local.db"),
             cloud_url=os.getenv("WHALETALE_CLOUD_URL", "https://api.whaletale.tech"),

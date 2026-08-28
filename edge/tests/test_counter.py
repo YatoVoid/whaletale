@@ -197,6 +197,70 @@ def test_track_that_never_nears_the_zone_is_ignored() -> None:
     assert c.stats.capture_rate == pytest.approx(0.0)
 
 
+def make_reentry_counter(min_dwell: float = 0.0) -> ZoneCounter:
+    z = Zone(
+        "sq",
+        [(0.4, 0.4), (0.6, 0.4), (0.6, 0.6), (0.4, 0.6)],
+        exit_margin=0.05,
+        catchment_margin=0.15,
+    )
+    return ZoneCounter(z, min_dwell_seconds=min_dwell, reentry_seconds=2.0, reentry_distance=0.06)
+
+
+def test_occluded_reappearance_is_one_entry() -> None:
+    # Spec 8.2: a new track id close in time and space to a just-dropped one is
+    # the same person after an occlusion, not a second entry.
+    c = make_reentry_counter()
+    for t in (0.0, 1.0, 2.0):
+        c.update(t, {1: INSIDE})
+    assert c.stats.entries == 1
+    c.end_track(1, 2.0)  # occlusion: tracker drops the id
+    for t in (3.0, 4.0, 5.0):
+        c.update(t, {2: INSIDE})  # reappears nearby under a fresh id
+    c.update(6.0, {2: OUTSIDE})
+    c.finalize(6.0)
+    assert c.stats.entries == 1
+    assert c.stats.reentries_merged == 1
+    assert c.stats.dwell_samples == [pytest.approx(6.0)]  # one visit, t=0..6
+
+
+def test_new_track_outside_the_window_is_a_fresh_entry() -> None:
+    c = make_reentry_counter()
+    for t in (0.0, 1.0, 2.0):
+        c.update(t, {1: INSIDE})
+    c.end_track(1, 2.0)
+    for t in (5.0, 6.0, 7.0):  # 3s later, past reentry_seconds=2.0
+        c.update(t, {2: INSIDE})
+    c.update(8.0, {2: OUTSIDE})
+    c.finalize(8.0)
+    assert c.stats.entries == 2
+    assert c.stats.reentries_merged == 0
+
+
+def test_new_track_far_away_is_a_fresh_entry() -> None:
+    c = make_reentry_counter()
+    z2_near = (0.45, 0.45)
+    for t in (0.0, 1.0, 2.0):
+        c.update(t, {1: z2_near})
+    c.end_track(1, 2.0)
+    for t in (3.0, 4.0, 5.0):  # in time, but the far corner of the zone
+        c.update(t, {2: (0.58, 0.58)})
+    c.finalize(6.0)
+    assert c.stats.entries == 2
+    assert c.stats.reentries_merged == 0
+
+
+def test_reentry_disabled_by_default_counts_both() -> None:
+    c = make_counter(min_dwell=0.0)
+    for t in (0.0, 1.0, 2.0):
+        c.update(t, {1: INSIDE})
+    c.end_track(1, 2.0)
+    for t in (3.0, 4.0, 5.0):
+        c.update(t, {2: INSIDE})
+    c.finalize(6.0)
+    assert c.stats.entries == 2
+
+
 def test_percentile() -> None:
     assert percentile([], 50) == 0.0
     assert percentile([4.0], 90) == 4.0

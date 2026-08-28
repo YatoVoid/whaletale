@@ -19,6 +19,7 @@ class _TrackState:
     pending_since: float = 0.0
     entered_polygon: bool = False  # ground point was inside the zone polygon at least once
     seen_in_catchment: bool = False  # ground point reached the zone's catchment
+    last_gp: tuple[float, float] = (0.0, 0.0)  # most recent ground point
 
 
 def percentile(values: list[float], q: float) -> float:
@@ -43,6 +44,7 @@ class ZoneStats:
     occupied_seconds: float = 0.0
     person_seconds: float = 0.0  # spec 6.4: sum over people of time inside, != occupied
     dwell_samples: list[float] = field(default_factory=list)
+    reentries_merged: int = 0  # spec 8.2: track fragments stitched back together
 
     @property
     def dwell_p50(self) -> float:
@@ -74,15 +76,35 @@ class ZoneCounter:
 
     A track is classified as a passerby when it is removed: it reached the
     zone's catchment but its ground point never entered the zone polygon.
+
+    Spec 8.2 re-entry grace window: an occluded person reappears under a fresh
+    track id, which would otherwise read as a second entry. When
+    `reentry_seconds` and `reentry_distance` are both > 0, a dropped track is
+    parked briefly; a new track that starts within that time and distance
+    inherits its state instead of opening a new visit.
     """
 
-    def __init__(self, zone: Zone, min_dwell_seconds: float = 3.0) -> None:
+    def __init__(
+        self,
+        zone: Zone,
+        min_dwell_seconds: float = 3.0,
+        *,
+        reentry_seconds: float = 0.0,
+        reentry_distance: float = 0.0,
+    ) -> None:
         self.zone = zone
         self.min_dwell_seconds = min_dwell_seconds
+        self.reentry_seconds = reentry_seconds
+        self.reentry_distance = reentry_distance
         self.stats = ZoneStats()
         self._tracks: dict[int, _TrackState] = {}
+        self._parked: dict[int, tuple[_TrackState, float]] = {}  # tid -> (state, dropped_at)
         self._last_t: float | None = None
         self._inside_count = 0  # tracks in INSIDE state as of _last_t
+
+    @property
+    def _reentry_enabled(self) -> bool:
+        return self.reentry_seconds > 0.0 and self.reentry_distance > 0.0
 
     def accrue_to(self, t: float) -> None:
         """Attribute the interval [_last_t, t] to the occupancy that held at
@@ -103,14 +125,16 @@ class ZoneCounter:
         for tid, gp in ground_points.items():
             self._advance(tid, gp, t)
 
+        self._expire_parked(t)
         self._inside_count = sum(1 for ts in self._tracks.values() if ts.state is _State.INSIDE)
         self.stats.peak_occupancy = max(self.stats.peak_occupancy, self._inside_count)
 
     def _advance(self, tid: int, gp: tuple[float, float], t: float) -> None:
         ts = self._tracks.get(tid)
         if ts is None:
-            ts = _TrackState()
+            ts = self._claim_parked(gp, t) or _TrackState()
             self._tracks[tid] = ts
+        ts.last_gp = gp
 
         inside_enter = self.zone.contains_enter(gp)
         inside_stay = self.zone.contains_stay(gp)
@@ -136,6 +160,36 @@ class ZoneCounter:
             self.stats.exits += 1
             ts.state = _State.OUTSIDE
 
+    def _claim_parked(self, gp: tuple[float, float], t: float) -> _TrackState | None:
+        """spec 8.2: a fresh track id near a just-dropped one is the same person
+        reappearing after an occlusion. Reuse the parked state so the visit is
+        not counted twice."""
+        if not self._reentry_enabled:
+            return None
+        best: tuple[int, float] | None = None
+        for ptid, (pstate, dropped_at) in self._parked.items():
+            if t - dropped_at > self.reentry_seconds:
+                continue
+            d = _dist(gp, pstate.last_gp)
+            if d <= self.reentry_distance and (best is None or d < best[1]):
+                best = (ptid, d)
+        if best is None:
+            return None
+        state, _ = self._parked.pop(best[0])
+        if state.state in (_State.PENDING, _State.INSIDE):
+            self.stats.reentries_merged += 1
+        return state
+
+    def _expire_parked(self, t: float) -> None:
+        stale = [
+            tid
+            for tid, (_, dropped_at) in self._parked.items()
+            if t - dropped_at > self.reentry_seconds
+        ]
+        for tid in stale:
+            state, _ = self._parked.pop(tid)
+            self._classify_on_remove(state, t)
+
     def _classify_on_remove(self, ts: _TrackState, t: float) -> None:
         if ts.state is _State.INSIDE:
             self.stats.dwell_samples.append(t - ts.first_inside_t)
@@ -144,11 +198,22 @@ class ZoneCounter:
 
     def end_track(self, tid: int, t: float) -> None:
         ts = self._tracks.pop(tid, None)
-        if ts is not None:
+        if ts is None:
+            return
+        if self._reentry_enabled:
+            self._parked[tid] = (ts, t)
+        else:
             self._classify_on_remove(ts, t)
 
     def finalize(self, t: float) -> None:
         self.accrue_to(t)
+        for ts, _ in self._parked.values():
+            self._classify_on_remove(ts, t)
+        self._parked.clear()
         for ts in self._tracks.values():
             self._classify_on_remove(ts, t)
         self._tracks.clear()
+
+
+def _dist(a: tuple[float, float], b: tuple[float, float]) -> float:
+    return float(((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) ** 0.5)
