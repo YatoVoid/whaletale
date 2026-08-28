@@ -9,24 +9,34 @@ from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from pydantic import BaseModel
 from sqlalchemy import select
 
 from whaletale_cloud import models as m
-from whaletale_cloud.api.deps import SessionDep
+from whaletale_cloud.api.deps import SessionDep, get_login_throttle
+from whaletale_cloud.api.security import security_event
 from whaletale_cloud.config import settings
 from whaletale_cloud.fleet import evaluate_fleet, sync_alerts
 
 router = APIRouter(prefix="/admin")
 
 
-def admin_auth(authorization: Annotated[str | None, Header()] = None) -> None:
+def admin_auth(request: Request, authorization: Annotated[str | None, Header()] = None) -> None:
+    ip = request.client.host if request.client else "unknown"
+    throttle = get_login_throttle(request)
+    if not throttle.allowed(ip):
+        security_event("admin_auth_locked_out", ip=ip)
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "too many failed attempts")
+
     token = ""
     if authorization and authorization.lower().startswith("bearer "):
         token = authorization.split(" ", 1)[1].strip()
     if not settings.admin_token or not hmac.compare_digest(token, settings.admin_token):
+        throttle.record_failure(ip)
+        security_event("admin_auth_denied", ip=ip)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "admin auth required")
+    throttle.record_success(ip)
 
 
 AdminAuth = Depends(admin_auth)
@@ -88,6 +98,7 @@ def run_evaluation(session: SessionDep) -> dict[str, int]:
     evaluated = evaluate_fleet(session)
     opened = sync_alerts(session, evaluated)
     total = sum(len(sh.alerts) for sh in evaluated)
+    security_event("admin_fleet_evaluate", sites=len(evaluated), alerts_opened=opened)
     return {"sites": len(evaluated), "alerts_active": total, "alerts_opened": opened}
 
 

@@ -127,7 +127,7 @@ def api_client(isolated_engine: Engine) -> Iterator[object]:
 
     from whaletale_cloud.api.app import create_app
     from whaletale_cloud.api.deps import get_session
-    from whaletale_cloud.api.security import RateLimiter
+    from whaletale_cloud.api.security import LoginThrottle, RateLimiter
 
     _truncate(isolated_engine)
     maker = sessionmaker(isolated_engine, expire_on_commit=False)
@@ -145,6 +145,7 @@ def api_client(isolated_engine: Engine) -> Iterator[object]:
 
     app = create_app()
     app.state.rate_limiter = RateLimiter()
+    app.state.login_throttle = LoginThrottle()
     app.dependency_overrides[get_session] = _session_override
     with TestClient(app) as client:
         client.db = maker

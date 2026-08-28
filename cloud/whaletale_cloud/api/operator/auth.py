@@ -8,7 +8,6 @@ sees their own sites.
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
 from typing import Annotated
 from uuid import UUID
@@ -17,10 +16,8 @@ from fastapi import Depends, Header, HTTPException, Request, status
 from sqlalchemy import select
 
 from whaletale_cloud import models as m
-from whaletale_cloud.api.deps import SessionDep
-from whaletale_cloud.api.security import hash_token, new_pairing_token
-
-log = logging.getLogger("whaletale.api.operator")
+from whaletale_cloud.api.deps import SessionDep, get_login_throttle
+from whaletale_cloud.api.security import hash_token, new_pairing_token, security_event
 
 
 @dataclass(frozen=True)
@@ -31,6 +28,7 @@ class OperatorContext:
     def require_site(self, site_id: str | UUID) -> str:
         sid = str(site_id)
         if sid not in self.site_ids:
+            security_event("operator_site_denied", user_id=self.user.id, site_id=sid)
             raise HTTPException(status.HTTP_403_FORBIDDEN, "not your site")
         return sid
 
@@ -55,7 +53,15 @@ def operator(
     session: SessionDep,
     authorization: Annotated[str | None, Header()] = None,
 ) -> OperatorContext:
+    ip = request.client.host if request.client else "unknown"
+    throttle = get_login_throttle(request)
+    if not throttle.allowed(ip):
+        security_event("operator_auth_locked_out", ip=ip)
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "too many failed attempts")
+
     if not authorization or not authorization.lower().startswith("bearer "):
+        throttle.record_failure(ip)
+        security_event("operator_auth_missing_token", ip=ip)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "missing bearer token")
     token = authorization.split(" ", 1)[1].strip()
     user = session.scalar(
@@ -65,9 +71,10 @@ def operator(
         )
     )
     if user is None:
-        ip = request.client.host if request.client else "unknown"
-        log.warning("operator auth: unknown or disabled token from %s", ip)
+        throttle.record_failure(ip)
+        security_event("operator_auth_invalid_token", ip=ip)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid token")
+    throttle.record_success(ip)
 
     site_ids = frozenset(
         str(s)
