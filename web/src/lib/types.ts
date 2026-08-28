@@ -104,6 +104,12 @@ export type ReshapeOut = {
   message: string;
 };
 
+export type CurrentZone = {
+  zone_version_id: string;
+  polygon: [number, number][];
+  version_number: number;
+};
+
 export type Camera = {
   id: string;
   name: string;

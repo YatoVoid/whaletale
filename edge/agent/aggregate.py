@@ -28,12 +28,25 @@ class RunAggregator:
     Feed `update` one call per processed frame, then `finalize` once.
     """
 
-    def __init__(self, zone: Zone, min_dwell_seconds: float, bucket_seconds: float) -> None:
+    def __init__(
+        self,
+        zone: Zone,
+        min_dwell_seconds: float,
+        bucket_seconds: float,
+        *,
+        reentry_seconds: float = 0.0,
+        reentry_distance: float = 0.0,
+    ) -> None:
         if bucket_seconds <= 0:
             raise ValueError(f"bucket_seconds must be > 0, got {bucket_seconds}")
         self.zone = zone
         self.bucket_seconds = bucket_seconds
-        self._counter = ZoneCounter(zone, min_dwell_seconds=min_dwell_seconds)
+        self._counter = ZoneCounter(
+            zone,
+            min_dwell_seconds=min_dwell_seconds,
+            reentry_seconds=reentry_seconds,
+            reentry_distance=reentry_distance,
+        )
         self._buckets: list[Bucket] = []
         self._bucket_index = 0
         self._bucket_start = 0.0
@@ -127,12 +140,19 @@ class WallClockAggregator:
         *,
         min_dwell_seconds: float = 3.0,
         bucket_seconds: int = 900,
+        reentry_seconds: float = 0.0,
+        reentry_distance: float = 0.0,
     ) -> None:
         if bucket_seconds <= 0:
             raise ValueError(f"bucket_seconds must be > 0, got {bucket_seconds}")
         self.bucket_seconds = bucket_seconds
         self._on_bucket = on_bucket
-        self._counter = ZoneCounter(zone, min_dwell_seconds=min_dwell_seconds)
+        self._counter = ZoneCounter(
+            zone,
+            min_dwell_seconds=min_dwell_seconds,
+            reentry_seconds=reentry_seconds,
+            reentry_distance=reentry_distance,
+        )
         self._bucket_start_ts: float | None = None
 
     def _align(self, ts: float) -> float:

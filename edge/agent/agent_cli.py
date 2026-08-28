@@ -90,6 +90,8 @@ def main(argv: list[str] | None = None) -> int:
         exit_margin=cfg.exit_margin_frac,
         catchment_margin=cfg.catchment_frac,
         bucket_seconds=int(cfg.bucket_seconds),
+        reentry_seconds=cfg.reentry_seconds,
+        reentry_distance=cfg.reentry_distance,
     )
 
     stop_at = time.monotonic() + args.seconds if args.seconds else None

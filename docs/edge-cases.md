@@ -1,0 +1,112 @@
+# Section 8 edge-case coverage
+
+Spec §8 lists every failure mode the system has to survive. This is the
+milestone-10 audit: for each item, where it is handled and the test that pins
+it, or an honest note on what is still missing and why.
+
+Status key: **done** (handled and tested), **partial** (the core is handled,
+a named refinement is not), **deferred** (not built, tracked below).
+
+## 8.1 Camera and stream
+
+| Case | Status | Where / test |
+|---|---|---|
+| Camera offline mid-bucket, mark partial, record `active_cameras`, no extrapolation | done | `pipeline.py` writes `active_cameras` per site-total from the set of cameras that produced a bucket; `test_wire_contract.test_edge_site_total_row_parses`, `test_admin_api.test_fleet_reports_state_and_alerts` |
+| Camera clock drift, reject frames > 60s from local time | deferred | See below. NTP sync is a deploy concern (`docs/runbook.md`); the in-agent reject is not built. |
+| Camera moved / re-aimed, perceptual hash vs hourly reference, flag `needs_recalibration`, stop counting | deferred | See below. |
+| Resolution / aspect ratio change, normalized polygons survive, flag for review | partial | Polygons are normalized end to end (`zones.py`, `test_zones.test_parse_zone_variants`); the review flag is not emitted. |
+| Frozen frame (identical consecutive frames > 30s), treat as offline | deferred | `decode.py` reconnect covers a hard stall (no new frames); a source still delivering one frozen image is not caught yet. |
+| RTSP credentials rotated, specific operator-facing message | partial | `DecodeError` surfaces the underlying error string (`test_decode.test_file_decode_failure_is_fatal`); it is not classified as an auth failure with dedicated copy. |
+| Night mode / IR switch, per-camera confidence baseline, flag `low_confidence` | partial | Cloud side is built and tested: `fleet._confidence_baseline`, `FleetConfig.confidence_drop`, `test_fleet.test_confidence_drop_from_baseline`. The edge does not yet stamp `low_confidence` on individual observation rows, and the agent does not populate per-camera `mean_confidence` in the heartbeat. |
+| Direct sun / blown highlights, same mechanism | partial | Same as above. |
+
+## 8.2 Detection and tracking
+
+| Case | Status | Where / test |
+|---|---|---|
+| Occluded person reappears under a new track id, inflates entries, re-entry grace window (N seconds, M pixels) | done | `counter.py` `_claim_parked` / `_expire_parked`, config `reentry_seconds` / `reentry_distance` (env `EDGE_REENTRY_SECONDS` / `EDGE_REENTRY_DISTANCE`); `test_counter.test_occluded_reappearance_is_one_entry`, `test_new_track_outside_the_window_is_a_fresh_entry`, `test_new_track_far_away_is_a_fresh_entry` |
+| Loitering at a boundary, `min_dwell_seconds` plus hysteresis | done | `zones.py` separate enter / stay thresholds; `test_counter.test_loitering_on_boundary_does_not_double_count` |
+| Staff walking through repeatedly, excluded zones plus a "staff hours" report filter | deferred | `Space.kind` exists but no `excluded` kind participates in counting, and reporting has no staff-hours filter. |
+| Glass-storefront reflections counted as people, operator marks polygon sub-regions excluded | deferred | Sub-region exclusion is unbuilt. |
+| Groups moving together, detection handles it, note a family of four counts as four | done (doc) | Model behavior; stated in this file's Known limitations. |
+| Children, wheelchairs, strollers, verify the model detects these or note the limitation | done (doc) | Stated in Known limitations. |
+| Empty site overnight, do not zero-fill outside operating hours, store operating hours per site | partial | The edge emits a bucket only when a zone produced activity, so it does not zero-fill; there is no explicit per-site `operating_hours` suppression. |
+
+## 8.3 Zones and tenancy
+
+| Case | Status | Where / test |
+|---|---|---|
+| Zone with < 3 points, reject at the UI | done | `validation.assert_saveable_polygon`, web zone editor guard; `test_validation.test_polygon_needs_three_points`, `test_zones.test_zone_rejects_fewer_than_three_points` |
+| Self-intersecting polygon, refuse to save | done | `test_validation.test_self_intersecting_polygon_is_rejected`, `test_zones.test_zone_rejects_self_intersecting_polygon`, `test_operator_api.test_reshape_rejects_a_self_intersecting_polygon` |
+| Zone entirely outside frame bounds, reject | done | `test_validation.test_polygon_must_be_inside_the_frame`, `test_siteconfig.test_invalid_configs_are_rejected` |
+| Two zones overlapping on one camera, allowed but warn and confirm parent/child | partial | Overlap is allowed (`Space.parent_space_id` exists); the warn-and-confirm step is not built. |
+| Space with no tenancy for a period, report as vacant | done | `attribution.py`; `test_attribution.test_never_leased_space_is_all_vacant`, `test_tenancy_gap_reads_as_vacant_between_two_occupants` |
+| Overlapping tenancies on one space, reject on save, show the conflict | done | `validation.find_tenancy_conflicts`; `test_validation.test_overlapping_permanent_tenancy_is_a_conflict`, `test_same_weekday_overlapping_daily_windows_conflict`, `test_operator_api.test_create_tenancy_then_conflict` |
+| Tenancy edited retroactively, recompute affected periods | done | Attribution joins at query time; `test_attribution.test_retroactive_tenancy_edit_recomputes` |
+| Recurring tenancy on a day the venue was closed, cross-reference `day_annotations`, suppress | done | `test_attribution.test_closure_annotation_suppresses_an_otherwise_occupied_bucket` |
+| Occupant renamed or merged, records referenced not copied | done | `test_attribution.test_occupant_rename_propagates_to_history`, `test_operator_api.test_create_and_rename_occupant` |
+| Timezone / DST boundary on a recurring Saturday, RRULE with an explicit timezone | done | `normalization.py` / `schedule.py` shift wall-clock in the site tz; `test_attribution.test_recurring_tenancy_is_saturday_only_and_within_daily_window`, `test_normalization.test_festival_saturday_is_flagged_as_an_anomaly` |
+
+## 8.4 System and data
+
+| Case | Status | Where / test |
+|---|---|---|
+| Edge box offline for days, SQLite buffers, sync idempotent and resumable with a watermark | done | `store.py` `synced_at IS NULL` watermark, `sync/client.py`; `test_sync_client.test_offline_leaves_rows_for_retry`, `test_non_2xx_is_not_acked`, `test_drain_pushes_everything_in_batches` |
+| Duplicate sync payload, upsert on `(zone_version_id, bucket_start)` | done | `test_api.test_ingest_upserts_and_is_idempotent`, `test_store.test_upsert_overwrites_and_rearms_for_sync` |
+| Edge disk fills, rotate oldest synced buckets, alert at 80% | done | `store.prune_synced`, fleet `disk_low_fraction` 0.20; `test_store.test_prune_keeps_unsynced_and_recent_synced`, `test_fleet.test_disk_low` |
+| Power loss mid-write, SQLite WAL, verify integrity on boot | done | `store.py` WAL + `PRAGMA integrity_check`; `test_store.test_integrity_check_rejects_a_non_database_file` |
+| Edge box replaced, site re-pairs with a token, historical cloud data intact | done | `pairing.py`, operator onboarding pair / revoke; `test_operator_onboarding.test_pair_edge_box_returns_a_token_once`, `test_revoke_box_drops_it_from_the_list` |
+| Schema version mismatch, cloud accepts older payloads and upgrades them | partial | Cloud rejects a newer `schema_version` (`test_api.test_newer_schema_version_is_409`). Only v1 exists, so "accept older" has nothing to exercise yet; the version gate is in place for when it does. |
+| Clock skew edge vs cloud, timestamps authored on the edge in UTC, cloud never re-stamps | done | `test_api.test_bucket_timestamp_is_stored_verbatim_never_restamped` |
+| Two operators editing zones at once, optimistic locking on `zone_versions`, conflict warning | done | `ReshapeIn.base_version_id` checked against the open primary in `routes.reshape_zone`, `GET .../zone-versions/current` to load it; `test_operator_api.test_reshape_conflicts_when_base_version_is_stale` |
+
+## 8.5 Commercial
+
+| Case | Status | Where / test |
+|---|---|---|
+| Camera added mid-period, show prorated change before confirming, never charge silently | done | `billing.preview_change` then `apply_change`; `test_billing.test_preview_reflects_the_live_camera_count`, `test_apply_add_prorates_immediately` |
+| Camera removed, prorate down next period, no mid-period refund | done | `apply_change` uses `proration_behavior="none"` on decreases; `test_billing.test_apply_remove_defers_to_next_period` |
+| Payment fails, grace period, dashboard read-only, edge keeps collecting | done | `is_read_only` after `grace_until`, `_require_writable` 402 on operator writes, ingest and heartbeat never gated; `test_billing.test_past_due_is_writable_during_grace_then_read_only`, `test_operator_write_is_402_when_read_only`, `test_ingest_is_never_gated_by_billing` |
+| Customer cancels, data export offered then deletion after a stated window | done | `handle_webhook` on `customer.subscription.deleted` sets `export_ready_at`; `test_billing.test_subscription_deleted_starts_export_window` |
+
+## Deferred, tracked
+
+These need a schema or product decision beyond a hardening pass, or edge-only
+work with a captured-frame constraint. None block the pilot; each is a known
+gap.
+
+1. **Camera clock-drift reject (§8.1).** Add a check in the agent that drops a
+   frame whose capture time is more than 60s from the box clock, and counts the
+   drops toward a `clock_drift` heartbeat signal. Deploy-side NTP is the primary
+   defense and is documented in the runbook.
+2. **Perceptual-hash recalibration (§8.1).** Sample a reference frame hourly,
+   hash it, and when the hash diverges past a threshold flag the camera
+   `needs_recalibration` and stop counting. The reference frame and hash never
+   leave the box.
+3. **Frozen-frame detection (§8.1).** Hash consecutive decoded frames; if they
+   are identical for more than 30s, treat the source as offline even though the
+   socket is open.
+4. **Per-camera confidence on the edge (§8.1).** The agent should track a
+   rolling mean detection confidence per camera, put it in the heartbeat
+   `per_camera` block, and stamp `low_confidence` on observation rows when it
+   drops sharply. The cloud already consumes this signal once it arrives.
+5. **Excluded zones and staff-hours filter (§8.2).** An `excluded` space kind
+   that the counter subtracts, plus a reporting toggle that drops configured
+   staff-hour windows.
+6. **Glass-reflection sub-region exclusion (§8.2).** Let the operator mark
+   holes inside a zone polygon that do not count.
+7. **Operating hours per site (§8.2).** Store open/close per weekday and skip
+   bucket emission outside them rather than relying on "no activity, no bucket".
+8. **Parent/child confirmation for overlapping zones (§8.3).** When two zones on
+   one camera overlap, warn and require the operator to set the parent/child
+   relation before saving.
+
+## Known limitations
+
+- Detection counts individuals. A group of four people reads as four entries;
+  there is no group or household de-duplication and there should not be.
+- Recall on children, wheelchair users, and people pushing strollers depends on
+  the person-detection model. It is not separately validated. Treat per-camera
+  counts for spaces with heavy stroller or wheelchair traffic as a floor.
+- The system never identifies individuals. Staff exclusion is geometric
+  (excluded zones), not biometric.

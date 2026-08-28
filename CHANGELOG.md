@@ -4,6 +4,23 @@ One entry per milestone from the project spec, Section 14.
 
 ## [Unreleased]
 
+### M10: Hardening
+- `docs/edge-cases.md`: full spec §8 coverage matrix (done / partial / deferred,
+  each row citing the test that pins it, plus a tracked list of the eight
+  deferred refinements and their build notes).
+- Edge: re-entry grace window (spec 8.2). An occluded person reappearing under a
+  new track id no longer counts as a second entry; a dropped track is parked for
+  `EDGE_REENTRY_SECONDS` and a new track within `EDGE_REENTRY_DISTANCE` inherits
+  its visit. `ZoneStats.reentries_merged` counts hits.
+- Cloud: optimistic locking on zone reshape (spec 8.4). `ReshapeIn.base_version_id`
+  is checked against the open primary; `GET /v1/spaces/{id}/zone-versions/current`
+  returns the id and polygon to edit from. Concurrent reshape returns 409.
+- Cloud: security headers on every API response (HSTS, nosniff, frame-deny,
+  no-referrer, `default-src 'none'` CSP).
+- Web: the zone editor loads the current polygon and version instead of starting
+  blank, and surfaces the reshape conflict.
+- Test: bucket timestamps are stored verbatim, the cloud never re-stamps (spec 8.4).
+
 ### M1: Prove the pipeline
 - Repository scaffold: layout, `.gitignore`, `.env.example`, pre-commit hooks,
   CI (lint, type-check, tests, secret scan, license audit), branch protection.

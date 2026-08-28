@@ -88,6 +88,24 @@ def test_ingest_upserts_and_is_idempotent(api_client: Any, paired: dict[str, Any
         assert s.scalar(select(func.count()).select_from(m.SiteTotal)) == 1
 
 
+def test_bucket_timestamp_is_stored_verbatim_never_restamped(
+    api_client: Any, paired: dict[str, Any]
+) -> None:
+    # spec 8.4: bucket timestamps are authored on the edge in UTC; the cloud
+    # stores them as sent and never substitutes its own clock.
+    edge_ts = datetime(2026, 3, 9, 7, 45, tzinfo=UTC)  # a US DST-transition morning
+    body = {
+        "schema_version": 1,
+        "site_id": paired["site_id"],
+        "observations": [_obs(paired["zv_id"], start=edge_ts, entries=4)],
+    }
+    assert _ingest(api_client, paired["token"], body).status_code == 200
+    with api_client.db() as s:
+        stored = s.scalar(select(m.Observation.bucket_start))
+        assert stored is not None
+        assert stored.astimezone(UTC) == edge_ts
+
+
 def test_missing_token_is_401(api_client: Any) -> None:
     r = api_client.post("/v1/ingest", json={"site_id": "x", "observations": []})
     assert r.status_code == 401
@@ -137,6 +155,15 @@ def test_oversized_body_is_413(api_client: Any, paired: dict[str, Any]) -> None:
         },
     )
     assert r.status_code == 413
+
+
+def test_security_headers_present_on_every_response(api_client: Any) -> None:
+    r = api_client.get("/healthz")
+    assert r.status_code == 200
+    assert r.headers["strict-transport-security"].startswith("max-age=")
+    assert r.headers["x-content-type-options"] == "nosniff"
+    assert r.headers["x-frame-options"] == "DENY"
+    assert "frame-ancestors 'none'" in r.headers["content-security-policy"]
 
 
 def test_rate_limit_returns_429(api_client: Any, paired: dict[str, Any]) -> None:

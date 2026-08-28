@@ -15,6 +15,7 @@ from whaletale_cloud import models as m
 from whaletale_cloud.api.deps import SessionDep
 from whaletale_cloud.api.operator.auth import OperatorDep
 from whaletale_cloud.api.operator.schemas import (
+    CurrentZoneOut,
     OccupancySpanOut,
     OccupantIn,
     OccupantOut,
@@ -401,6 +402,33 @@ def delete_tenancy(session: SessionDep, ctx: OperatorDep, tenancy_id: UUID) -> N
 # --- zone editor -----------------------------------------------------
 
 
+@router.get(
+    "/spaces/{space_id}/zone-versions/current",
+    response_model=CurrentZoneOut,
+)
+def current_zone(session: SessionDep, ctx: OperatorDep, space_id: UUID) -> CurrentZoneOut:
+    _space_or_403(session, ctx, space_id)
+    versions = list(
+        session.scalars(
+            select(m.ZoneVersion)
+            .where(m.ZoneVersion.space_id == space_id)
+            .order_by(m.ZoneVersion.effective_from)
+        )
+    )
+    idx = next(
+        (i for i, v in enumerate(versions) if v.is_primary and v.effective_to is None),
+        None,
+    )
+    if idx is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no open primary zone version")
+    v = versions[idx]
+    return CurrentZoneOut(
+        zone_version_id=v.id,
+        polygon=[(p[0], p[1]) for p in v.polygon],
+        version_number=idx + 1,
+    )
+
+
 @router.post(
     "/spaces/{space_id}/zone-versions/reshape",
     response_model=ReshapeOut,
@@ -427,6 +455,11 @@ def reshape_zone(
         raise HTTPException(
             status.HTTP_409_CONFLICT,
             "no open primary zone version to reshape; create one via onboarding",
+        )
+    if body.base_version_id is not None and body.base_version_id != open_primary.id:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "this zone changed since you opened it; reload and reapply your edit",
         )
 
     now = datetime.now(UTC)

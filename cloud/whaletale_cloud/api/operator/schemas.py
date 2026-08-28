@@ -136,6 +136,16 @@ class OccupantIn(BaseModel):
 class ReshapeIn(BaseModel):
     polygon: list[tuple[float, float]]
     created_by: str
+    # spec 8.4: optimistic lock. The id of the open primary the editor loaded.
+    # If another operator has since reshaped, this no longer matches and the
+    # save is refused with a conflict instead of silently stacking versions.
+    base_version_id: UUID | None = None
+
+
+class CurrentZoneOut(BaseModel):
+    zone_version_id: UUID
+    polygon: list[tuple[float, float]]
+    version_number: int
 
 
 class ReshapeOut(BaseModel):
