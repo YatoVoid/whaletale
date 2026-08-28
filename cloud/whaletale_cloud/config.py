@@ -22,6 +22,14 @@ class Settings(BaseSettings):
     admin_token: str = Field(default="", validation_alias="WHALETALE_ADMIN_TOKEN")
     # spec 9: Sentry for exceptions.
     sentry_dsn: str = Field(default="", validation_alias="SENTRY_DSN")
+    # spec 8.5 / 12: Stripe billing on camera count.
+    stripe_secret_key: str = Field(default="", validation_alias="STRIPE_SECRET_KEY")
+    stripe_webhook_secret: str = Field(default="", validation_alias="STRIPE_WEBHOOK_SECRET")
+    stripe_price_id: str = Field(default="", validation_alias="STRIPE_PRICE_ID")
+    billing_grace_days: int = Field(default=7, validation_alias="WHALETALE_BILLING_GRACE_DAYS")
+    billing_export_window_days: int = Field(
+        default=30, validation_alias="WHALETALE_BILLING_EXPORT_DAYS"
+    )
 
 
 settings = Settings()

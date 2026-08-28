@@ -39,6 +39,10 @@ def register_camera(
     session: SessionDep, ctx: OperatorDep, site_id: UUID, body: CameraIn
 ) -> m.Camera:
     ctx.require_site(site_id)
+    from whaletale_cloud.billing import get_subscription, is_read_only
+
+    if is_read_only(get_subscription(session, site_id)):
+        raise HTTPException(status.HTTP_402_PAYMENT_REQUIRED, "billing past due; read-only")
     cam = m.Camera(
         site_id=site_id,
         name=body.name,

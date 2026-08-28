@@ -42,3 +42,28 @@ export async function addCamera(
     };
   }
 }
+
+export async function previewBilling(
+  siteId: string,
+): Promise<{ ok: true; preview: import("@/lib/types").ChangePreview } | { ok: false; error: string }> {
+  try {
+    const preview = await api<import("@/lib/types").ChangePreview>(
+      `/v1/sites/${siteId}/billing/preview`,
+    );
+    return { ok: true, preview };
+  } catch (e) {
+    return { ok: false, error: e instanceof ApiError ? e.message : "Preview failed." };
+  }
+}
+
+export async function applyBilling(
+  siteId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await api(`/v1/sites/${siteId}/billing/apply`, { method: "POST" });
+    revalidatePath("/settings");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof ApiError ? e.message : "Apply failed." };
+  }
+}

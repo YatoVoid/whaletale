@@ -135,6 +135,21 @@ disk < 20%, mean confidence down > 30% from baseline, agent version behind → *
 | Alerts don't clear after the box recovers | `POST /admin/fleet/evaluate` hasn't run since | Schedule it (every few minutes). It resolves rows whose condition is gone. |
 | `low_confidence` noisy at dawn/dusk | IR switch / low sun; the baseline hasn't caught up | Expected transient. Persistent means a moved or failing camera (spec 8.1). |
 
+## M9: billing
+
+Stripe subscription per site, quantity = the number of `cameras` rows
+(recomputed server-side, never trusted from the client). `GET .../billing`,
+`GET .../billing/preview`, `POST .../billing/apply`. Stripe events hit
+`POST /webhooks/stripe`, signature-verified.
+
+| Symptom | Cause | Action |
+|---|---|---|
+| Console shows "read-only" | payment failed and the grace window (`WHALETALE_BILLING_GRACE_DAYS`) has elapsed | The customer resolves payment in Stripe; `invoice.paid` clears it. Ingest and heartbeats keep running the whole time (spec 8.5). |
+| `.../billing/preview` → 409 "no subscription" | the site was never set up in Stripe | Create the customer + subscription and insert a `subscriptions` row. |
+| Adding a camera didn't change the bill | `apply` wasn't called after `register_camera`, or the count matched | The preview → confirm flow in Settings calls `apply`. Removes only take effect next period (spec 8.5). |
+| Webhook returns 400 | bad `Stripe-Signature` or `STRIPE_WEBHOOK_SECRET` unset | Check the signing secret matches the endpoint's in the Stripe dashboard. |
+| A canceled site still shows data | export window (`WHALETALE_BILLING_EXPORT_DAYS`) | Data is retained until `export_ready_at` passes, then a separate job deletes it. |
+
 ## Later milestones
 
 Filled in as each merges. Cloud/site alerting starts at M8.

@@ -48,19 +48,39 @@ router = APIRouter(prefix="/v1")
 _DEFAULT_DAYS = 7
 
 
-def _site_or_403(session: Session, ctx: OperatorDep, site_id: UUID) -> m.Site:
+def _require_writable(session: Session, site_id: UUID) -> None:
+    """spec 8.5: after the grace window, operator writes are read-only. Ingest
+    and heartbeats are never gated - that gap is unrecoverable."""
+    from whaletale_cloud.billing import get_subscription, is_read_only
+
+    if is_read_only(get_subscription(session, site_id)):
+        raise HTTPException(
+            status.HTTP_402_PAYMENT_REQUIRED,
+            "billing is past due; the console is read-only until payment is resolved",
+        )
+
+
+def _site_or_403(
+    session: Session, ctx: OperatorDep, site_id: UUID, *, writable: bool = False
+) -> m.Site:
     ctx.require_site(site_id)
     site = session.get(m.Site, site_id)
     if site is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "site not found")
+    if writable:
+        _require_writable(session, site_id)
     return site
 
 
-def _space_or_403(session: Session, ctx: OperatorDep, space_id: UUID) -> m.Space:
+def _space_or_403(
+    session: Session, ctx: OperatorDep, space_id: UUID, *, writable: bool = False
+) -> m.Space:
     space = session.get(m.Space, space_id)
     if space is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "space not found")
     ctx.require_site(space.site_id)
+    if writable:
+        _require_writable(session, space.site_id)
     return space
 
 
@@ -229,7 +249,7 @@ def list_occupants(session: SessionDep, ctx: OperatorDep, site_id: UUID) -> list
 def create_occupant(
     session: SessionDep, ctx: OperatorDep, site_id: UUID, body: OccupantIn
 ) -> OccupantOut:
-    _site_or_403(session, ctx, site_id)
+    _site_or_403(session, ctx, site_id, writable=True)
     occ = m.Occupant(
         site_id=site_id,
         name=body.name,
@@ -256,6 +276,7 @@ def update_occupant(
     if occ is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "occupant not found")
     ctx.require_site(occ.site_id)
+    _require_writable(session, occ.site_id)
     # spec 8.3: rename in place; history is a join, so it updates everywhere.
     occ.name = body.name
     occ.contact_email = body.contact_email
@@ -311,7 +332,7 @@ def schedule(
 def create_tenancy(
     session: SessionDep, ctx: OperatorDep, space_id: UUID, body: TenancyIn
 ) -> TenancyOut:
-    space = _space_or_403(session, ctx, space_id)
+    space = _space_or_403(session, ctx, space_id, writable=True)
     occ = session.get(m.Occupant, body.occupant_id)
     if occ is None or occ.site_id != space.site_id:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "occupant not at this site")
@@ -373,6 +394,7 @@ def delete_tenancy(session: SessionDep, ctx: OperatorDep, tenancy_id: UUID) -> N
     space = session.get(m.Space, t.space_id)
     assert space is not None
     ctx.require_site(space.site_id)
+    _require_writable(session, space.site_id)
     session.delete(t)  # spec 8.3: retroactive edit; affected reports recompute on the join
 
 
@@ -387,7 +409,7 @@ def delete_tenancy(session: SessionDep, ctx: OperatorDep, tenancy_id: UUID) -> N
 def reshape_zone(
     session: SessionDep, ctx: OperatorDep, space_id: UUID, body: ReshapeIn
 ) -> ReshapeOut:
-    _space_or_403(session, ctx, space_id)
+    _space_or_403(session, ctx, space_id, writable=True)
     try:
         assert_saveable_polygon(body.polygon)
     except PolygonError as exc:
