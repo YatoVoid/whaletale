@@ -44,6 +44,7 @@ def _sample() -> ReportData:
         entries_vs_self=_cmp(1964, anomaly=True),
         capture_rate_vs_self=_cmp(0.461),
         degraded_bucket_count=2,
+        low_confidence_bucket_count=3,
         hourly=[HourBar(h, max(0, 40 - abs(14 - h) * 3)) for h in range(24)],
         daily=[
             DayBar(i, lbl, 200 + i * 30)

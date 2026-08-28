@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Download, Pencil } from "lucide-react";
-import { AnomalyMark, DegradedMark, VacantTag } from "@/components/marks";
+import {
+  AnomalyMark,
+  DegradedMark,
+  LowConfidenceMark,
+  VacantTag,
+} from "@/components/marks";
 import { Metric } from "@/components/metric";
 import { OccupancyTimeline } from "@/components/occupancy-timeline";
 import { api, ApiError } from "@/lib/api";
@@ -60,7 +65,8 @@ export default async function SpaceDetailPage({
       </div>
 
       <p className="mt-4 text-xs text-ink-soft">
-        {period} · {space.kind} · <DegradedMark count={m.degraded_bucket_count} />
+        {period} · {space.kind} · <DegradedMark count={m.degraded_bucket_count} />{" "}
+        <LowConfidenceMark count={m.low_confidence_bucket_count} />
       </p>
 
       <div className="wt-hairline mt-4 grid grid-cols-2 gap-x-10 gap-y-5 border-y py-5 sm:grid-cols-4">

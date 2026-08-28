@@ -49,6 +49,7 @@ class SpaceMetricsOut(BaseModel):
     peer_count: int | None
     entries_is_anomaly: bool
     degraded_bucket_count: int
+    low_confidence_bucket_count: int
 
 
 class OccupancySpanOut(BaseModel):

@@ -7,7 +7,8 @@ corrected late changes the next report (spec 5.2.1).
 
 from __future__ import annotations
 
-from collections import Counter
+import statistics
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from uuid import UUID
@@ -18,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from whaletale_cloud import models as m
 from whaletale_cloud.attribution import AttributionRow, attribute_space
+from whaletale_cloud.fleet import FleetConfig
 from whaletale_cloud.metrics import aggregate, site_people_by_bucket
 from whaletale_cloud.normalization import (
     PeerRank,
@@ -77,6 +79,10 @@ class ReportData:
     entries_vs_self: SelfComparison
     capture_rate_vs_self: SelfComparison
     degraded_bucket_count: int
+    # spec 8.1: buckets a backing camera produced while its detection confidence
+    # was well below its own normal (IR switch, blown highlights). Treat the
+    # counts in these intervals as a floor, not a measurement.
+    low_confidence_bucket_count: int
 
     hourly: list[HourBar]
     daily: list[DayBar]
@@ -96,6 +102,9 @@ def build_report(session: Session, space_id: UUID, start: datetime, end: datetim
     totals = site_people_by_bucket(session, site.id, start, end)
     metrics = aggregate(rows, totals)
     normalized = normalize_space(session, space_id, start, end)
+
+    flagged = low_confidence_buckets(session, space_id, start, end)
+    low_confidence_count = sum(1 for r in rows if r.bucket_start in flagged)
 
     period_start = start.astimezone(tz).date()
     period_end = (end.astimezone(tz) - timedelta(seconds=1)).date()
@@ -120,11 +129,72 @@ def build_report(session: Session, space_id: UUID, start: datetime, end: datetim
         entries_vs_self=normalized.entries_vs_self,
         capture_rate_vs_self=normalized.capture_rate_vs_self,
         degraded_bucket_count=metrics.degraded_bucket_count,
+        low_confidence_bucket_count=low_confidence_count,
         hourly=hourly,
         daily=daily,
         occupancy=occupancy,
         anomalies=anomalies,
     )
+
+
+_LOW_CONF_BASELINE_PAD = timedelta(days=14)  # trailing heartbeats that set "normal"
+_LOW_CONF_MIN_SAMPLES = 8
+
+
+def low_confidence_buckets(
+    session: Session, space_id: UUID, start: datetime, end: datetime
+) -> set[datetime]:
+    """15-minute bucket starts where a camera backing this space was running
+    well below its own baseline detection confidence (spec 8.1). Baseline is the
+    75th percentile of that camera's heartbeat `mean_confidence` over the period
+    plus a trailing pad, so a camera that dips every night still has a sane
+    "good conditions" reference. Empty when there are no heartbeats."""
+    space = session.get(m.Space, space_id)
+    if space is None:
+        return set()
+    cam_names = {
+        n
+        for n in session.scalars(
+            select(m.Camera.name)
+            .join(m.ZoneVersion, m.ZoneVersion.camera_id == m.Camera.id)
+            .where(m.ZoneVersion.space_id == space_id)
+        )
+    }
+    if not cam_names:
+        return set()
+
+    rows = session.execute(
+        select(m.Heartbeat.received_at, m.Heartbeat.per_camera).where(
+            m.Heartbeat.site_id == space.site_id,
+            m.Heartbeat.received_at >= start - _LOW_CONF_BASELINE_PAD,
+            m.Heartbeat.received_at < end,
+        )
+    ).all()
+
+    samples: dict[str, list[tuple[datetime, float]]] = defaultdict(list)
+    for received_at, per_camera in rows:
+        for cam in per_camera or []:
+            name = str(cam.get("id", ""))
+            mc = cam.get("mean_confidence")
+            if name in cam_names and isinstance(mc, int | float):
+                samples[name].append((received_at, float(mc)))
+
+    drop = FleetConfig().confidence_drop
+    flagged: set[datetime] = set()
+    for pts in samples.values():
+        vals = sorted(v for _, v in pts)
+        if len(vals) < _LOW_CONF_MIN_SAMPLES:
+            continue
+        baseline = vals[int(0.75 * (len(vals) - 1))]
+        threshold = baseline * (1 - drop)
+        by_bucket: dict[datetime, list[float]] = defaultdict(list)
+        for t, v in pts:
+            b = t.replace(minute=(t.minute // 15) * 15, second=0, microsecond=0)
+            by_bucket[b].append(v)
+        for b, vs in by_bucket.items():
+            if start <= b < end and statistics.fmean(vs) < threshold:
+                flagged.add(b)
+    return flagged
 
 
 def _hourly(rows: list[AttributionRow], tz: ZoneInfo) -> list[HourBar]:

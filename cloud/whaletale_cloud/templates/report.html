@@ -104,6 +104,7 @@
 
   <p class="note">
     {% if d.degraded_bucket_count %}{{ d.degraded_bucket_count }} bucket(s) fell back to a secondary camera and are marked degraded. {% endif %}
+    {% if d.low_confidence_bucket_count %}{{ d.low_confidence_bucket_count }} bucket(s) ran below the camera's normal detection confidence (low light or glare); treat those counts as a floor. {% endif %}
     Metric definitions: entry, capture rate, traffic share, dwell, passerby — see docs/metrics.md.
     Generated {{ d.generated_at.strftime("%Y-%m-%d %H:%M UTC") }}.
   </p>
