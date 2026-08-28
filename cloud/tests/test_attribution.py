@@ -4,14 +4,13 @@ from datetime import UTC, datetime, time, timedelta
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
-import pytest
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from schemas.enums import BucketQuality, DayAnnotationKind, TenancyKind
 from whaletale_cloud import models as m
 from whaletale_cloud.attribution import attribute_space
-from whaletale_cloud.seed import SITE_TZ, SeedResult, seed_demo
+from whaletale_cloud.seed import SITE_TZ, SeedResult
 
 TZ = ZoneInfo(SITE_TZ)
 
@@ -20,12 +19,6 @@ def _window(res: SeedResult, day_from: int, day_to: int) -> tuple[datetime, date
     start = datetime.combine(res.epoch + timedelta(days=day_from), time(0), tzinfo=TZ)
     end = datetime.combine(res.epoch + timedelta(days=day_to), time(0), tzinfo=TZ)
     return start.astimezone(UTC), end.astimezone(UTC)
-
-
-@pytest.fixture
-def seeded(clean_db: Session) -> tuple[Session, SeedResult]:
-    res = seed_demo(clean_db, weeks=5)
-    return clean_db, res
 
 
 def test_permanent_tenancy_attributes_every_bucket(seeded: tuple[Session, SeedResult]) -> None:

@@ -5,9 +5,10 @@ from collections.abc import Iterator
 
 import pytest
 from sqlalchemy import Engine, create_engine, text
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 
 from whaletale_cloud.models import Base
+from whaletale_cloud.seed import SeedResult, seed_demo
 
 
 @pytest.fixture(scope="session")
@@ -29,27 +30,57 @@ def pg_url() -> Iterator[str]:
         yield pg.get_connection_url()
 
 
+def _fresh_database(pg_url: str, name: str) -> str:
+    admin = create_engine(pg_url, future=True, isolation_level="AUTOCOMMIT")
+    with admin.connect() as c:
+        c.execute(text(f'DROP DATABASE IF EXISTS "{name}"'))
+        c.execute(text(f'CREATE DATABASE "{name}"'))
+    admin.dispose()
+    return pg_url.rsplit("/", 1)[0] + "/" + name
+
+
 @pytest.fixture(scope="session")
 def engine(pg_url: str) -> Iterator[Engine]:
-    eng = create_engine(pg_url, future=True)
+    """Schema-only engine on a dedicated database, seeded once by `seed_result`.
+
+    Per-test isolation is a savepoint rollback (see `seeded` / `db`), so the
+    seed survives the whole session.
+    """
+    url = _fresh_database(pg_url, "whaletale_test")
+    eng = create_engine(url, future=True)
     Base.metadata.create_all(eng)
     yield eng
     eng.dispose()
 
 
+@pytest.fixture(scope="session")
+def seed_result(engine: Engine) -> SeedResult:
+    with Session(engine) as s:
+        res = seed_demo(s, weeks=6)
+        s.commit()
+    return res
+
+
 @pytest.fixture
-def db(engine: Engine) -> Iterator[Session]:
-    """A session wrapped in a transaction rolled back after each test, so tests
-    stay isolated without recreating the schema. `create_savepoint` keeps a
-    failed flush (e.g. an expected IntegrityError) from poisoning the outer
-    transaction."""
+def seeded(engine: Engine, seed_result: SeedResult) -> Iterator[tuple[Session, SeedResult]]:
+    """The shared seed plus a session whose writes roll back after the test."""
     connection = engine.connect()
     txn = connection.begin()
-    session = Session(
-        bind=connection,
-        expire_on_commit=False,
-        join_transaction_mode="create_savepoint",
-    )
+    session = Session(bind=connection, join_transaction_mode="create_savepoint")
+    try:
+        yield session, seed_result
+    finally:
+        session.close()
+        txn.rollback()
+        connection.close()
+
+
+@pytest.fixture
+def db(engine: Engine) -> Iterator[Session]:
+    """A bare session (over the seeded database) that rolls back after the test."""
+    connection = engine.connect()
+    txn = connection.begin()
+    session = Session(bind=connection, join_transaction_mode="create_savepoint")
     try:
         yield session
     finally:
@@ -58,14 +89,23 @@ def db(engine: Engine) -> Iterator[Session]:
         connection.close()
 
 
+@pytest.fixture(scope="session")
+def isolated_engine(pg_url: str) -> Iterator[Engine]:
+    """A separate empty database for tests that TRUNCATE or assert absolute row
+    counts and must not see the shared seed."""
+    url = _fresh_database(pg_url, "whaletale_test_isolated")
+    eng = create_engine(url, future=True)
+    Base.metadata.create_all(eng)
+    yield eng
+    eng.dispose()
+
+
 @pytest.fixture
-def clean_db(engine: Engine) -> Iterator[Session]:
-    """Like `db` but truncates every table first for tests that need to assert
-    on absolute row counts or run the seed."""
-    with engine.begin() as conn:
+def clean_db(isolated_engine: Engine) -> Iterator[Session]:
+    with isolated_engine.begin() as conn:
         tables = ", ".join(f'"{t.name}"' for t in reversed(Base.metadata.sorted_tables))
         conn.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))
-    session = sessionmaker(bind=engine, expire_on_commit=False, future=True)()
+    session = Session(isolated_engine, expire_on_commit=False)
     try:
         yield session
         session.commit()

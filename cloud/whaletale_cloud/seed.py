@@ -242,6 +242,9 @@ def _seed_observations(
             day += timedelta(days=1)
             continue
         festival = day == res.festival_day
+        # A day-level swing so weekday-to-weekday comparison has real variance
+        # for normalization to work against (spec 6.5).
+        day_factor = min(1.5, max(0.6, rng.gauss(1.0, 0.12)))
         for hour in range(OPEN_HOUR, CLOSE_HOUR):
             for minute in (0, 15, 30, 45):
                 bstart = datetime.combine(day, time(hour, minute), tzinfo=tz).astimezone(UTC)
@@ -253,7 +256,7 @@ def _seed_observations(
                     if zv_id is None:
                         continue
                     peak, dwell_p50, capture = _KIND_PROFILE[kind]
-                    mult = 1.0
+                    mult = day_factor
                     if weekend:
                         mult *= 1.6 if kind in (SpaceKind.STALL, SpaceKind.PATIO) else 1.2
                     if festival:
