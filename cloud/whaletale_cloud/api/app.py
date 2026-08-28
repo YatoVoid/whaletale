@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
 from whaletale_cloud.api import heartbeat, ingest
+from whaletale_cloud.api.operator import onboarding as operator_onboarding
 from whaletale_cloud.api.operator import routes as operator_routes
 
 log = logging.getLogger("whaletale.api")
@@ -32,6 +33,7 @@ def create_app() -> FastAPI:
     app.include_router(ingest.router)
     app.include_router(heartbeat.router)
     app.include_router(operator_routes.router)
+    app.include_router(operator_onboarding.router)
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:

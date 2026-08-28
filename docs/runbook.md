@@ -99,6 +99,24 @@ Reports, and Settings screens follow. Sign-in is email + operator token
 | Schedule grid slow for a wide range | it resolves every (space, day) with RRULE expansion | Capped at 62 days per request. The console pages by month. |
 | A renamed occupant still shows the old name somewhere | a cached response | The DB is correct (rename is in place, spec 8.3); the console just needs to refetch. |
 
+## M7: onboarding
+
+`whaletale-onboard` on the edge box discovers cameras (WS-Discovery) or
+validates a manual RTSP URL against the gate (opens < 10s, ≥ 640×480, decode
+≥ 2 fps, test inference < 200ms, ≥ 1 clean frame). It seals the RTSP
+credentials with a key derived from `WHALETALE_SITE_SECRET` and emits a
+`site.json` camera block. The console pairs boxes and records validated
+cameras.
+
+| Symptom | Cause | Action |
+|---|---|---|
+| `whaletale-onboard --discover` finds nothing | cameras on a separate VLAN, or multicast blocked | Use `--source rtsp://…` with the URL from the camera's own admin page. |
+| Validation `FAIL opens` | wrong RTSP path or credentials, camera unreachable | Confirm the URL plays in `ffplay`. |
+| Validation `FAIL achievable fps` on a real camera | the box is CPU-only or overloaded | Expected on a Jetson / no-GPU box; M4 batching and a GPU fix it. The gate is advisory here — re-run with the target hardware. |
+| `FAIL test inference` | model not cached, or the box is too slow | Pre-warm with `whaletale-agent --warm`; on a slow box, `--no-inference` skips this one check. |
+| Console "Add camera" 422 | resolution not `WxH` | Enter e.g. `1920x1080`. |
+| Sealed credentials won't decrypt on the box | `WHALETALE_SITE_SECRET` differs from when they were sealed | Re-run `whaletale-onboard --emit` with the current secret. |
+
 ## Later milestones
 
 Filled in as each merges. Cloud/site alerting starts at M8.

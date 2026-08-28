@@ -103,3 +103,20 @@ export type ReshapeOut = {
   previous_version_id: string | null;
   message: string;
 };
+
+export type Camera = {
+  id: string;
+  name: string;
+  resolution: string;
+  fps_target: number;
+  status: string;
+  last_seen_at: string | null;
+};
+
+export type EdgeBox = {
+  id: string;
+  name: string | null;
+  agent_version: string | null;
+  last_seen_at: string | null;
+  created_at: string;
+};

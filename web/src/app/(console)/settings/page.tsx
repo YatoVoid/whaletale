@@ -1,11 +1,22 @@
 import { api } from "@/lib/api";
 import { auth } from "@/lib/auth";
-import type { Site } from "@/lib/types";
+import type { Camera, EdgeBox, Site } from "@/lib/types";
+import { Cameras, EdgeBoxes } from "./onboarding-panels";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   const [sites, session] = await Promise.all([api<Site[]>("/v1/sites"), auth()]);
+  const siteId = sites[0]?.id;
+
+  let cameras: Camera[] = [];
+  let boxes: EdgeBox[] = [];
+  if (siteId) {
+    [cameras, boxes] = await Promise.all([
+      api<Camera[]>(`/v1/sites/${siteId}/cameras`).catch(() => []),
+      api<EdgeBox[]>(`/v1/sites/${siteId}/edge-boxes`).catch(() => []),
+    ]);
+  }
 
   return (
     <div className="wt-settle max-w-2xl">
@@ -29,10 +40,15 @@ export default async function SettingsPage() {
         ))}
       </ul>
 
-      <p className="mt-6 max-w-prose text-sm text-ink-soft">
-        Camera onboarding, operating hours, user management, and billing land in
-        M7–M9. Edge boxes are paired on the cloud with
-        <code className="wt-id"> pair_edge_box()</code> for now.
+      {siteId && (
+        <>
+          <EdgeBoxes siteId={siteId} boxes={boxes} />
+          <Cameras siteId={siteId} cameras={cameras} />
+        </>
+      )}
+
+      <p className="mt-8 max-w-prose text-sm text-ink-soft">
+        Operating hours, user management, and billing land in M8–M9.
       </p>
     </div>
   );

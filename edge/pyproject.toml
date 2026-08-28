@@ -12,12 +12,20 @@ dependencies = [
     "shapely>=2.0.6",
     "numpy>=1.26.0,<2.0.0",  # ceiling comes from norfair 2.3
     "pillow>=11.0.0",
+    "cryptography>=43.0.0",  # M7: encrypt RTSP credentials at rest
+    "wsdiscovery>=2.0.0",  # M7: WS-Discovery camera probe
 ]
+
+[project.optional-dependencies]
+# M7: ONVIF device query (model, RTSP profile URI). Heavy SOAP stack, so kept
+# optional — WS-Discovery alone still finds cameras.
+onvif = ["onvif-zeep>=0.2.12"]
 
 [project.scripts]
 whaletale-edge = "agent.cli:main"
 whaletale-agent = "agent.agent_cli:main"
 whaletale-sync = "sync.sync_cli:main"
+whaletale-onboard = "onboarding.onboard_cli:main"
 
 [dependency-groups]
 dev = [
@@ -76,4 +84,4 @@ testpaths = ["tests"]
 
 [tool.coverage.run]
 # cli.py is wiring, exercised by the smoke run in docs/runbook.md, not units.
-omit = ["agent/cli.py", "agent/agent_cli.py", "sync/sync_cli.py", "tests/*"]
+omit = ["agent/cli.py", "agent/agent_cli.py", "sync/sync_cli.py", "onboarding/onboard_cli.py", "tests/*"]
