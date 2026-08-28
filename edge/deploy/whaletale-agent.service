@@ -1,0 +1,26 @@
+[Unit]
+Description=WhaleTale edge agent (multi-camera capture and rollup)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=whaletale
+Group=whaletale
+EnvironmentFile=/etc/whaletale/agent.env
+ExecStart=/opt/whaletale/venv/bin/whaletale-agent --config /etc/whaletale/site.json
+Restart=always
+RestartSec=5
+# The agent decodes RTSP; a wedged stream is handled in-process (reconnect with
+# backoff), but if the process itself hangs, systemd restarts it.
+TimeoutStopSec=20
+KillSignal=SIGTERM
+# Hardening: the agent needs the network, its venv, and the local SQLite buffer.
+ProtectSystem=strict
+ReadWritePaths=/var/lib/whaletale
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

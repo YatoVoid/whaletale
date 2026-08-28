@@ -39,22 +39,34 @@ class PersonDetector:
             raise RuntimeError(f"model {model_id!r} has no 'person' class in id2label")
 
     def detect(self, rgb: Frame) -> list[tuple[BBoxNorm, float]]:
+        return self.detect_batch([rgb])[0]
+
+    def detect_batch(self, frames: list[Frame]) -> list[list[tuple[BBoxNorm, float]]]:
+        """One processor call and one model forward for the whole batch, then
+        results split back per frame. Batching across camera streams is the
+        single biggest throughput win (spec 6.2 step 2)."""
+        if not frames:
+            return []
         from PIL import Image
 
-        h, w = rgb.shape[:2]
-        inputs = self.processor(images=Image.fromarray(rgb), return_tensors="pt").to(self.device)
+        images = [Image.fromarray(f) for f in frames]
+        sizes = [(f.shape[0], f.shape[1]) for f in frames]
+        inputs = self.processor(images=images, return_tensors="pt").to(self.device)
         with self._torch.no_grad():
             outputs = self.model(**inputs)
-        result = self.processor.post_process_object_detection(
-            outputs, target_sizes=[(h, w)], threshold=self.score_threshold
-        )[0]
+        results = self.processor.post_process_object_detection(
+            outputs, target_sizes=sizes, threshold=self.score_threshold
+        )
 
-        dets: list[tuple[BBoxNorm, float]] = []
-        for score, label, box in zip(
-            result["scores"], result["labels"], result["boxes"], strict=True
-        ):
-            if int(label) not in self._person_labels:
-                continue
-            x1, y1, x2, y2 = (float(v) for v in box)
-            dets.append(((x1 / w, y1 / h, x2 / w, y2 / h), float(score)))
-        return dets
+        out: list[list[tuple[BBoxNorm, float]]] = []
+        for (h, w), result in zip(sizes, results, strict=True):
+            dets: list[tuple[BBoxNorm, float]] = []
+            for score, label, box in zip(
+                result["scores"], result["labels"], result["boxes"], strict=True
+            ):
+                if int(label) not in self._person_labels:
+                    continue
+                x1, y1, x2, y2 = (float(v) for v in box)
+                dets.append(((x1 / w, y1 / h, x2 / w, y2 / h), float(score)))
+            out.append(dets)
+        return out

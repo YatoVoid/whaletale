@@ -37,6 +37,8 @@ def percentile(values: list[float], q: float) -> float:
 @dataclass
 class ZoneStats:
     entries: int = 0
+    exits: int = 0  # clean outside transitions through the boundary (spec 5.1)
+    peak_occupancy: int = 0  # max concurrent people inside during the bucket (spec 5.1)
     passersby: int = 0
     occupied_seconds: float = 0.0
     person_seconds: float = 0.0  # spec 6.4: sum over people of time inside, != occupied
@@ -49,6 +51,12 @@ class ZoneStats:
     @property
     def dwell_p90(self) -> float:
         return percentile(self.dwell_samples, 90)
+
+    @property
+    def capture_events(self) -> int:
+        """spec 5.1: the stored numerator for capture rate. On the edge every
+        entry counts, so this equals `entries`."""
+        return self.entries
 
     @property
     def capture_rate(self) -> float:
@@ -96,6 +104,7 @@ class ZoneCounter:
             self._advance(tid, gp, t)
 
         self._inside_count = sum(1 for ts in self._tracks.values() if ts.state is _State.INSIDE)
+        self.stats.peak_occupancy = max(self.stats.peak_occupancy, self._inside_count)
 
     def _advance(self, tid: int, gp: tuple[float, float], t: float) -> None:
         ts = self._tracks.get(tid)
@@ -124,6 +133,7 @@ class ZoneCounter:
                 ts.state = _State.OUTSIDE
         elif ts.state is _State.INSIDE and not inside_stay:
             self.stats.dwell_samples.append(t - ts.first_inside_t)
+            self.stats.exits += 1
             ts.state = _State.OUTSIDE
 
     def _classify_on_remove(self, ts: _TrackState, t: float) -> None:

@@ -45,6 +45,11 @@ class Config:
     # usual foot-traffic granularity. A run shorter than one bucket produces a
     # single bucket.
     bucket_seconds: float = 900.0
+    # Local SQLite buffer for 15-minute rollups until the sync client ships them.
+    sqlite_path: str = "./edge_local.db"
+    # Cloud endpoint and pairing, used by the sync client.
+    cloud_url: str = "https://api.whaletale.tech"
+    pairing_token: str = ""
 
     def __post_init__(self) -> None:
         if self.target_fps <= 0:
@@ -75,4 +80,7 @@ class Config:
             exit_margin_frac=_env_float("EDGE_EXIT_MARGIN_FRAC", 0.02),
             catchment_frac=_env_float("EDGE_CATCHMENT_FRAC", 0.08),
             bucket_seconds=_env_float("EDGE_BUCKET_SECONDS", 900.0),
+            sqlite_path=os.getenv("EDGE_SQLITE_PATH", "./edge_local.db"),
+            cloud_url=os.getenv("WHALETALE_CLOUD_URL", "https://api.whaletale.tech"),
+            pairing_token=os.getenv("WHALETALE_PAIRING_TOKEN", ""),
         )

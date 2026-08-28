@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import math
+from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from agent.counter import ZoneCounter, ZoneStats
 from agent.zones import Zone
@@ -91,8 +94,81 @@ class RunAggregator:
         out = ZoneStats()
         for b in self._buckets:
             out.entries += b.stats.entries
+            out.exits += b.stats.exits
+            out.peak_occupancy = max(out.peak_occupancy, b.stats.peak_occupancy)
             out.passersby += b.stats.passersby
             out.occupied_seconds += b.stats.occupied_seconds
             out.person_seconds += b.stats.person_seconds
             out.dwell_samples.extend(b.stats.dwell_samples)
         return out
+
+
+@dataclass(frozen=True)
+class WallClockBucket:
+    start: datetime  # UTC, aligned to `bucket_seconds` (spec 5.1: 15 min)
+    end: datetime
+    stats: ZoneStats
+
+
+class WallClockAggregator:
+    """Like `RunAggregator`, but buckets are wall-clock windows aligned to
+    `bucket_seconds` (spec 6.2 step 7: "15-minute buckets"), and each finished
+    bucket is handed to `on_bucket` for the SQLite store.
+
+    `update` takes the frame's real capture time. Track identity is continuous
+    across boundaries; time metrics split at the boundary, events land where
+    they resolve (same rule as `RunAggregator`).
+    """
+
+    def __init__(
+        self,
+        zone: Zone,
+        on_bucket: Callable[[WallClockBucket], None],
+        *,
+        min_dwell_seconds: float = 3.0,
+        bucket_seconds: int = 900,
+    ) -> None:
+        if bucket_seconds <= 0:
+            raise ValueError(f"bucket_seconds must be > 0, got {bucket_seconds}")
+        self.bucket_seconds = bucket_seconds
+        self._on_bucket = on_bucket
+        self._counter = ZoneCounter(zone, min_dwell_seconds=min_dwell_seconds)
+        self._bucket_start_ts: float | None = None
+
+    def _align(self, ts: float) -> float:
+        return math.floor(ts / self.bucket_seconds) * self.bucket_seconds
+
+    def _flush(self, bucket_start_ts: float) -> None:
+        stats = self._counter.stats
+        self._counter.stats = ZoneStats()
+        self._on_bucket(
+            WallClockBucket(
+                start=datetime.fromtimestamp(bucket_start_ts, UTC),
+                end=datetime.fromtimestamp(bucket_start_ts + self.bucket_seconds, UTC),
+                stats=stats,
+            )
+        )
+
+    def update(self, captured_at: datetime, ground_points: dict[int, tuple[float, float]]) -> None:
+        ts = captured_at.timestamp()
+        if self._bucket_start_ts is None:
+            self._bucket_start_ts = self._align(ts)
+        while ts >= self._bucket_start_ts + self.bucket_seconds:
+            boundary = self._bucket_start_ts + self.bucket_seconds
+            self._counter.accrue_to(boundary)
+            self._flush(self._bucket_start_ts)
+            self._bucket_start_ts = boundary
+        self._counter.update(ts, ground_points)
+
+    def end_track(self, tid: int, captured_at: datetime) -> None:
+        if self._bucket_start_ts is not None:
+            self._counter.end_track(tid, captured_at.timestamp())
+
+    def close(self, captured_at: datetime) -> None:
+        """Flush the final partial bucket at end of stream."""
+        if self._bucket_start_ts is None:
+            return
+        ts = captured_at.timestamp()
+        self._counter.finalize(max(ts, self._bucket_start_ts))
+        self._flush(self._bucket_start_ts)
+        self._bucket_start_ts = None

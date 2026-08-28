@@ -100,3 +100,53 @@ def test_entries_so_far_includes_the_in_progress_bucket() -> None:
     agg.update(1.0, {1: INSIDE})  # entry resolves here, still in bucket 0
     assert agg.entries_so_far == 1
     assert agg.buckets == []  # bucket 0 not flushed yet
+
+
+# --- WallClockAggregator ---------------------------------------------------
+
+from datetime import UTC, datetime, timedelta  # noqa: E402
+
+from agent.aggregate import WallClockAggregator, WallClockBucket  # noqa: E402
+
+
+def _wc_zone() -> Zone:
+    return Zone(
+        "sq",
+        [(0.4, 0.4), (0.6, 0.4), (0.6, 0.6), (0.4, 0.6)],
+        exit_margin=0.05,
+        catchment_margin=0.15,
+    )
+
+
+def test_wallclock_buckets_align_to_the_15_minute_grid() -> None:
+    got: list[WallClockBucket] = []
+    agg = WallClockAggregator(_wc_zone(), got.append, min_dwell_seconds=0.0, bucket_seconds=900)
+    base = datetime(2026, 6, 1, 10, 7, tzinfo=UTC)  # 10:07 -> bucket 10:00
+    for i in range(0, 20):
+        agg.update(base + timedelta(minutes=i), {1: INSIDE})
+    agg.close(base + timedelta(minutes=20))
+
+    starts = [b.start for b in got]
+    assert starts[0] == datetime(2026, 6, 1, 10, 0, tzinfo=UTC)
+    assert starts[1] == datetime(2026, 6, 1, 10, 15, tzinfo=UTC)
+    assert all(b.end - b.start == timedelta(minutes=15) for b in got[:-1])
+
+
+def test_wallclock_entry_lands_in_the_bucket_it_resolves_in() -> None:
+    got: list[WallClockBucket] = []
+    agg = WallClockAggregator(_wc_zone(), got.append, min_dwell_seconds=0.0, bucket_seconds=600)
+    base = datetime(2026, 6, 1, 10, 0, tzinfo=UTC)
+    # inside for 25 minutes across two 10-minute boundaries
+    for i in range(0, 26):
+        agg.update(base + timedelta(minutes=i), {1: INSIDE})
+    agg.close(base + timedelta(minutes=26))
+
+    assert [b.stats.entries for b in got] == [1, 0, 0]
+    # occupied time splits across the buckets, summing to ~24 minutes
+    total_occ = sum(b.stats.occupied_seconds for b in got)
+    assert 23 * 60 <= total_occ <= 25 * 60
+
+
+def test_wallclock_rejects_bad_bucket_seconds() -> None:
+    with pytest.raises(ValueError):
+        WallClockAggregator(_wc_zone(), lambda _b: None, bucket_seconds=0)

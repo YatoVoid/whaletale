@@ -1,0 +1,34 @@
+{
+  "site_id": "00000000-0000-0000-0000-000000000000",
+  "cloud_url": "https://api.whaletale.tech",
+  "pairing_token": "REPLACE_ME",
+  "cameras": [
+    {
+      "name": "front-hall",
+      "source": "rtsp://USER:PASS@camera.local/stream1",
+      "zones": [
+        {
+          "zone_version_id": "11111111-1111-1111-1111-111111111111",
+          "kind": "entrance",
+          "polygon": [[0.30, 0.55], [0.70, 0.55], [0.78, 0.95], [0.22, 0.95]]
+        }
+      ]
+    },
+    {
+      "name": "market-aisle",
+      "source": "rtsp://USER:PASS@camera2.local/stream1",
+      "zones": [
+        {
+          "zone_version_id": "22222222-2222-2222-2222-222222222222",
+          "kind": "stall",
+          "polygon": [[0.10, 0.40], [0.45, 0.40], [0.45, 0.90], [0.10, 0.90]]
+        },
+        {
+          "zone_version_id": "33333333-3333-3333-3333-333333333333",
+          "kind": "corridor",
+          "polygon": [[0.50, 0.40], [0.90, 0.40], [0.90, 0.90], [0.50, 0.90]]
+        }
+      ]
+    }
+  ]
+}

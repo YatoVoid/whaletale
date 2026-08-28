@@ -15,6 +15,26 @@ One entry per milestone from the project spec, Section 14.
   backoff while a file decode error stays fatal; zone-rectangle bounds checks;
   tests for decode decimation, reconnect give-up, and the new failure paths.
 
+### M4: Edge agent
+- Bucket stats reconciled to the Section 5.1 `observations` columns: `exits`
+  (clean boundary crossings), `peak_occupancy` (max concurrent in the bucket),
+  `capture_events` (= entries on the edge).
+- `agent/store.py`: local SQLite buffer for 15-minute rollups. WAL, integrity
+  check on open, upsert on `(zone_version_id, bucket_start)`, `synced_at IS NULL`
+  as the sync watermark, `prune_synced` rotation (spec 8.4).
+- `WallClockAggregator`: buckets aligned to real 15-minute wall-clock windows,
+  each finished bucket handed to the store.
+- `agent/detect.py`: `detect_batch` - one processor call and one model forward
+  for frames batched across every stream (spec 6.2 step 2).
+- `agent/siteconfig.py`: the git-ignored per-box `site.json` (cameras, sources,
+  zone polygons with cloud `zone_version_id`s), validated on load.
+- `agent/pipeline.py` + `whaletale-agent`: one decode thread per camera, one
+  batched inference per tick, per-zone tracking and aggregation into the store,
+  per-bucket `site_totals`. One dead camera does not stop the others.
+- `sync/` + `whaletale-sync`: watermark push (idempotent, resumable, buffers
+  through a WAN outage) and a Section 9 heartbeat. No third-party HTTP dep.
+- `edge/deploy/`: systemd units for the agent and sync services.
+
 ### M4 (early, ahead of sequence): edge attribution + rollup buckets
 - Edge attribution: zone catchment (polygon dilated by `catchment_frac`),
   passerby tracking (a track that reaches the catchment but never the zone

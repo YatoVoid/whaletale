@@ -49,6 +49,23 @@ p50/p90, plus the achievable decode+inference FPS.
 Model weights download on first run to `EDGE_HF_CACHE` (default `edge/.hf_cache`)
 and are git-ignored.
 
+## Running the edge agent (M4)
+
+The multi-camera daemon reads a per-box `site.json` (cameras, RTSP sources, zone
+polygons with their cloud `zone_version_id`; never committed - see
+`edge/site.example.json`), batches inference across streams, and writes
+15-minute rollups to a local SQLite buffer.
+
+```bash
+cd edge
+cp site.example.json site.json          # then edit for the real site
+uv run whaletale-agent --config site.json --seconds 120
+uv run whaletale-sync  --config site.json --dry-run    # show the buffered backlog
+uv run whaletale-sync  --config site.json --once       # ship it (needs a cloud from M5)
+```
+
+`edge/deploy/` has the systemd units for a real box.
+
 ## Cloud (M2: schema and attribution)
 
 Postgres schema, synthetic seed, and the attribution / metrics / normalization
