@@ -115,10 +115,21 @@ uv run whaletale-report --seed --out report   # writes report.html and report.pd
 PDF rendering (WeasyPrint) needs `libpango-1.0-0 libpangoft2-1.0-0`; `--html-only`
 skips it.
 
-## Web
+## Web (M6: operator console)
 
-Not built yet. The M6 operator console (Next.js App Router, Auth.js login,
-shadcn/ui, Recharts) is next; the API it consumes lives in `cloud/`.
+Next.js App Router + TypeScript. The visual world is a working drawing set —
+flat ink on paper, hairline rules, the grid as the structure (see `DESIGN.md`).
+
+```bash
+cd web
+pnpm install
+cp .env.example .env.local          # set AUTH_SECRET and WHALETALE_API_URL
+pnpm dev                            # needs the cloud API running (whaletale-api)
+```
+
+Sign in with an operator email and token (`create_operator_user` on the cloud).
+Shipped screens: Overview, Schedule, Space detail, Spaces, Occupants. Zone
+editor, Reports, and Settings are in progress.
 
 ## Development
 

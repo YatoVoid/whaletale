@@ -31,6 +31,20 @@ One entry per milestone from the project spec, Section 14.
 - `whaletale_cloud/schedule.py`: per-day occupant resolution reusing the
   attribution tenancy rules.
 
+### M6: Operator console (frontend, in progress)
+- `web/`: Next.js App Router + TypeScript scaffold. Visual world is a "working
+  drawing set" — flat ink on paper, hairline rules, the grid as structure
+  (`DESIGN.md`), self-hosted IBM Plex, light only. Auth.js sign-in (email +
+  operator token for now).
+- Screens: Overview (site health, spaces ranked by capture rate with this-week
+  vs prior-week deltas, vacancies), Schedule (spaces×days grid, block select,
+  side-panel assignment with permanent / weekly / one-off forms and conflict
+  surfacing), Space detail (metrics with definition links + units + period,
+  occupancy timeline, report PDF), Spaces list, Occupants (list + add).
+  Vacancy, anomalous, and degraded each render as a distinct state.
+- `web` CI job (typecheck, lint, vitest, build) and branch-protection check.
+- Still to come: zone editor, Reports, Settings screens.
+
 ### M5: Cloud API + sync
 - `shared/schemas/wire.py`: the edge <-> cloud sync contract (`IngestRequest`,
   `HeartbeatRequest`, ...), separate from the persisted-row models so a payload

@@ -1,0 +1,137 @@
+@import "tailwindcss";
+
+/* WhaleTale console — a working drawing set. See /DESIGN.md. Light only. */
+@theme {
+  --color-paper: #f6f5f1;
+  --color-paper-raised: #fbfaf7;
+  --color-ink: #1b1a16;
+  --color-ink-soft: #5c584e;
+  --color-rule: #d7d3c8;
+  --color-field: #2f4f4f;
+  --color-field-weak: #b6c2bf;
+  --color-flag: #b23a26;
+  --color-degraded: #8a7d5c;
+
+  --font-serif: var(--font-plex-serif), Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SFMono-Regular", monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.5rem;
+  --text-2xl: 2rem;
+
+  --shadow-panel: 0 8px 24px -12px rgb(27 26 22 / 0.28);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: light;
+  background: var(--color-paper);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: 1.5;
+  font-feature-settings: "tnum" 1, "cv05" 1, "ss01" 1;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin: 0;
+  text-wrap: balance;
+}
+
+/* Browser surfaces carry the world too (craft floor). */
+::selection {
+  background: color-mix(in srgb, var(--color-field) 18%, transparent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+  border-radius: 1px;
+}
+
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-paper);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-rule);
+  border: 3px solid var(--color-paper);
+  border-radius: 999px;
+}
+* {
+  scrollbar-color: var(--color-rule) var(--color-paper);
+  scrollbar-width: thin;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* The one authored moment: rules and figures settle on first paint. */
+@keyframes wt-settle {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.wt-settle {
+  animation: wt-settle 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Vacancy: a "not surveyed" hatch, wherever it appears. */
+.wt-vacant {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 3px,
+    var(--color-rule) 3px,
+    var(--color-rule) 4px
+  );
+}
+
+.wt-hairline {
+  border-color: var(--color-rule);
+}
+
+/* Tabular data and identifiers. */
+.wt-num {
+  font-variant-numeric: tabular-nums;
+}
+.wt-id {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-ink-soft);
+}
