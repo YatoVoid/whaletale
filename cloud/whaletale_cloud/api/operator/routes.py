@@ -190,6 +190,7 @@ def space_detail(
             peer_count=norm.peer_rank.peer_count if norm.peer_rank else None,
             entries_is_anomaly=norm.entries_vs_self.is_anomaly,
             degraded_bucket_count=rep.degraded_bucket_count,
+            low_confidence_bucket_count=rep.low_confidence_bucket_count,
         ),
         occupancy=[
             OccupancySpanOut(occupant_name=o.occupant_name, start=o.start, end=o.end)

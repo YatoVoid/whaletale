@@ -17,8 +17,8 @@ a named refinement is not), **deferred** (not built, tracked below).
 | Resolution / aspect ratio change, normalized polygons survive, flag for review | partial | Polygons are normalized end to end (`zones.py`, `test_zones.test_parse_zone_variants`); the review flag is not emitted. |
 | Frozen frame (identical consecutive frames > 30s), treat as offline | done | `decode.FrozenFrameDetector`, wired into `_CameraWorker`; a stalled source sets a `frozen frame` worker error like a decode failure. `EDGE_FROZEN_FRAME_SECONDS` (default 30). `test_decode.test_frozen_frame_detector_*`, `test_pipeline.test_frozen_stream_surfaces_a_worker_error` |
 | RTSP credentials rotated, specific operator-facing message | partial | `DecodeError` surfaces the underlying error string (`test_decode.test_file_decode_failure_is_fatal`); it is not classified as an auth failure with dedicated copy. |
-| Night mode / IR switch, per-camera confidence baseline, flag `low_confidence` | partial | End to end: the agent tracks a rolling per-camera mean detection confidence and fps, writes them to the local `camera_health` table (`pipeline._flush_camera_health`, `test_pipeline`), the sync client puts them in the heartbeat `per_camera` block, and the cloud derives the drop (`fleet._confidence_baseline`, `FleetConfig.confidence_drop`, `test_fleet.test_confidence_drop_from_baseline`). Not yet done: stamping `low_confidence` on individual observation rows. |
-| Direct sun / blown highlights, same mechanism | partial | Same as above. |
+| Night mode / IR switch, per-camera confidence baseline, flag `low_confidence` | done | The agent tracks a rolling per-camera mean detection confidence and ships it in the heartbeat `per_camera` block; the fleet view raises a `low_confidence` alert (`fleet._confidence_baseline`, `test_fleet.test_confidence_drop_from_baseline`); and `report.low_confidence_buckets` marks the 15-minute buckets a backing camera produced while it was below the 75th-percentile of its own confidence by `FleetConfig.confidence_drop`, surfaced as `low_confidence_bucket_count` on the report, the space-detail API, and the console. `test_report.test_low_confidence_buckets_are_counted_from_heartbeats` |
+| Direct sun / blown highlights, same mechanism | done | Same mechanism; a camera's own baseline absorbs a permanently-bright view, so only real dips flag. |
 
 ## 8.2 Detection and tracking
 
@@ -75,17 +75,13 @@ These need a schema or product decision beyond a hardening pass, or edge-only
 work with a captured-frame constraint. None block the pilot; each is a known
 gap.
 
-1. **`low_confidence` on observation rows (§8.1).** The per-camera confidence
-   signal now reaches the cloud fleet view; the remaining piece is stamping a
-   `low_confidence` flag on the individual `observations` rows a camera
-   produced while its confidence was depressed, so a report can grey them out.
-2. **Excluded zones in the console + staff-hours filter (§8.2).** The edge
+1. **Excluded zones in the console + staff-hours filter (§8.2).** The edge
    masking is done. Remaining: an `EXCLUDED` space kind so an operator can draw
    an excluded zone in the console (today it is authored in the site config),
    and a report-time toggle that drops configured staff-hour windows.
-3. **Glass-reflection sub-region exclusion (§8.2).** Let the operator mark
+2. **Glass-reflection sub-region exclusion (§8.2).** Let the operator mark
    holes inside a zone polygon that do not count.
-4. **Operating hours per site (§8.2).** Store open/close per weekday and skip
+3. **Operating hours per site (§8.2).** Store open/close per weekday and skip
    bucket emission outside them rather than relying on "no activity, no bucket".
 
 Customer-audience fleet alerts (`camera_dark`, `camera_moved`) currently

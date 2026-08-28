@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, time, timedelta
+from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
+from whaletale_cloud import models as m
 from whaletale_cloud.metrics import space_metrics
 from whaletale_cloud.report import build_report, demo_period
 from whaletale_cloud.seed import SITE_TZ, SeedResult
@@ -74,6 +76,48 @@ def test_festival_day_shows_in_the_anomaly_table_with_its_annotation(
     assert festival[0].annotation_kind == "event"
     assert "Festival" in (festival[0].annotation_label or "")
     assert festival[0].entries_z is not None and festival[0].entries_z > 2
+
+
+def _seed_heartbeats(
+    db: Session, res: SeedResult, day: object, *, dip_hours: range, camera: str = "cam-a"
+) -> None:
+    box = m.EdgeBox(site_id=res.site_id, name="box-1", token_hash="0" * 64)
+    db.add(box)
+    db.flush()
+    for hour in range(6, 20):
+        for minute in (0, 15, 30, 45):
+            at = datetime.combine(day, time(hour, minute), tzinfo=TZ).astimezone(UTC)  # type: ignore[arg-type]
+            conf = 0.30 if hour in dip_hours else 0.85
+            db.add(
+                m.Heartbeat(
+                    id=uuid4(),
+                    edge_box_id=box.id,
+                    site_id=res.site_id,
+                    received_at=at,
+                    agent_version="0.10.0",
+                    uptime_seconds=3600.0,
+                    disk_free_bytes=10**11,
+                    buckets_pending_sync=0,
+                    per_camera=[{"id": camera, "mean_confidence": conf}],
+                )
+            )
+    db.flush()
+
+
+def test_low_confidence_buckets_are_counted_from_heartbeats(
+    seeded: tuple[Session, SeedResult],
+) -> None:
+    db, res = seeded
+    start, end = _week(res, 2)
+    day = res.epoch + timedelta(weeks=2, days=2)  # a mid-week day in the period
+    _seed_heartbeats(db, res, day, dip_hours=range(10, 12))  # 10:00-11:45 depressed
+
+    d = build_report(db, res.space_ids["stall-1"], start, end)
+    assert d.low_confidence_bucket_count > 0
+
+    # a different week with no heartbeats: nothing flagged
+    s3, e3 = _week(res, 3)
+    assert build_report(db, res.space_ids["stall-1"], s3, e3).low_confidence_bucket_count == 0
 
 
 def test_demo_period_picks_a_week_with_a_real_baseline(

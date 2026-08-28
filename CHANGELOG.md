@@ -26,6 +26,12 @@ One entry per milestone from the project spec, Section 14.
 - Cloud: `security_event()` writes one structured line to the `whaletale.security`
   logger for every auth failure, permission denial, rate-limit hit, and admin
   action, so they can be shipped somewhere queryable.
+- Cloud + web: low-confidence buckets (spec 8.1). `report.low_confidence_buckets`
+  marks the 15-minute buckets a backing camera produced while it was running
+  below the 75th percentile of its own heartbeat confidence (IR switch, glare),
+  surfaced as `low_confidence_bucket_count` on the report PDF, the space-detail
+  API, and the console. Self-calibrating per camera: an evenly-lit view never
+  flags. No edge or schema change.
 - Edge: excluded zones (spec 8.2). A zone with `"excluded": true` in the site
   config becomes a staff-only mask; any detection whose ground point falls
   inside it is dropped before any counting zone sees it, so repeated staff

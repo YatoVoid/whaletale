@@ -37,6 +37,7 @@ export type SpaceMetrics = {
   peer_count: number | null;
   entries_is_anomaly: boolean;
   degraded_bucket_count: number;
+  low_confidence_bucket_count: number;
 };
 
 export type OccupancySpan = {

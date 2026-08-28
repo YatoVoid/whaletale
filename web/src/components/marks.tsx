@@ -35,3 +35,15 @@ export function DegradedMark({ count }: { count: number }) {
     </span>
   );
 }
+
+export function LowConfidenceMark({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <span
+      className="text-xs text-degraded"
+      title={`${count} bucket(s) ran below the camera's normal detection confidence (low light or glare); treat those counts as a floor`}
+    >
+      {count} low-confidence
+    </span>
+  );
+}
