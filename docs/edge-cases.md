@@ -26,7 +26,7 @@ a named refinement is not), **deferred** (not built, tracked below).
 |---|---|---|
 | Occluded person reappears under a new track id, inflates entries, re-entry grace window (N seconds, M pixels) | done | `counter.py` `_claim_parked` / `_expire_parked`, config `reentry_seconds` / `reentry_distance` (env `EDGE_REENTRY_SECONDS` / `EDGE_REENTRY_DISTANCE`); `test_counter.test_occluded_reappearance_is_one_entry`, `test_new_track_outside_the_window_is_a_fresh_entry`, `test_new_track_far_away_is_a_fresh_entry` |
 | Loitering at a boundary, `min_dwell_seconds` plus hysteresis | done | `zones.py` separate enter / stay thresholds; `test_counter.test_loitering_on_boundary_does_not_double_count` |
-| Staff walking through repeatedly, excluded zones plus a "staff hours" report filter | deferred | `Space.kind` exists but no `excluded` kind participates in counting, and reporting has no staff-hours filter. |
+| Staff walking through repeatedly, excluded zones plus a "staff hours" report filter | partial | Excluded zones are done on the edge: a zone with `"excluded": true` in the site config becomes an `ExclusionMask`, and any detection whose ground point falls inside is dropped before any counting zone sees it (`pipeline._drop_excluded`). `test_siteconfig.test_excluded_zone_*`, `test_pipeline.test_excluded_zone_masks_staff_detections`. Still deferred: creating an excluded zone through the console (needs an `EXCLUDED` space kind), and the report-time staff-hours window filter. |
 | Glass-storefront reflections counted as people, operator marks polygon sub-regions excluded | deferred | Sub-region exclusion is unbuilt. |
 | Groups moving together, detection handles it, note a family of four counts as four | done (doc) | Model behavior; stated in this file's Known limitations. |
 | Children, wheelchairs, strollers, verify the model detects these or note the limitation | done (doc) | Stated in Known limitations. |
@@ -79,9 +79,10 @@ gap.
    signal now reaches the cloud fleet view; the remaining piece is stamping a
    `low_confidence` flag on the individual `observations` rows a camera
    produced while its confidence was depressed, so a report can grey them out.
-2. **Excluded zones and staff-hours filter (§8.2).** An `excluded` space kind
-   that the counter subtracts, plus a reporting toggle that drops configured
-   staff-hour windows.
+2. **Excluded zones in the console + staff-hours filter (§8.2).** The edge
+   masking is done. Remaining: an `EXCLUDED` space kind so an operator can draw
+   an excluded zone in the console (today it is authored in the site config),
+   and a report-time toggle that drops configured staff-hour windows.
 3. **Glass-reflection sub-region exclusion (§8.2).** Let the operator mark
    holes inside a zone polygon that do not count.
 4. **Operating hours per site (§8.2).** Store open/close per weekday and skip
