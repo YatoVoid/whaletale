@@ -9,6 +9,10 @@ detection, applies zone logic, and writes counts to local SQLite. Only kilobyte
 aggregates sync to the cloud. No frames, crops, embeddings, or track paths are
 ever stored.
 
+**Operations handbook:** [`docs/index.html`](docs/index.html) is the full
+run/use/edge-case reference with interface renderings of every console view.
+Served at the repository's GitHub Pages URL when Pages is enabled on `/docs`.
+
 ## Repository layout
 
 | Path | Contents |

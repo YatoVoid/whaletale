@@ -1,0 +1,758 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>WhaleTale Handbook</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="How to run and operate WhaleTale end to end: every CLI and env var, each console screen, the fleet admin API, the statistics, and exact edge-case behaviour.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23f6f5f1'/%3E%3Cpath d='M3 12h10L8 3z' fill='none' stroke='%232f4f4f' stroke-width='1.2'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@400;600&display=swap">
+
+<style>
+:root {
+  --paper: #f6f5f1;
+  --paper-raised: #fbfaf7;
+  --ink: #1b1a16;
+  --ink-soft: #5c584e;
+  --rule: #d7d3c8;
+  --field: #2f4f4f;
+  --field-weak: #b6c2bf;
+  --flag: #b23a26;
+  --degraded: #8a7d5c;
+  --shadow: 0 8px 24px -12px rgba(27,26,22,.28);
+  --hatch: repeating-linear-gradient(45deg, transparent 0 2px, var(--rule) 2px 3px);
+  --sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --serif: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #1a1916;
+    --paper-raised: #22201b;
+    --ink: #ece7da;
+    --ink-soft: #a49d8b;
+    --rule: #3a362d;
+    --field: #82aaa0;
+    --field-weak: #3f5652;
+    --flag: #db6d52;
+    --degraded: #ab9c72;
+    --shadow: 0 8px 24px -12px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #1a1916;
+  --paper-raised: #22201b;
+  --ink: #ece7da;
+  --ink-soft: #a49d8b;
+  --rule: #3a362d;
+  --field: #82aaa0;
+  --field-weak: #3f5652;
+  --flag: #db6d52;
+  --degraded: #ab9c72;
+  --shadow: 0 8px 24px -12px rgba(0,0,0,.6);
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 1.5rem; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.6;
+  font-feature-settings: "tnum" 1, "cv05" 1;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { display: grid; grid-template-columns: 15rem minmax(0,1fr); gap: 0; max-width: 82rem; margin: 0 auto; }
+
+.rail {
+  position: sticky; top: 0; align-self: start; height: 100dvh; overflow-y: auto;
+  border-right: 1px solid var(--rule);
+  padding: 1.6rem 1.1rem 2rem;
+}
+.rail .brand { font-family: var(--serif); font-size: 18px; letter-spacing: -.01em; }
+.rail .brand span { display: block; font-family: var(--sans); font-size: 12px; color: var(--ink-soft); margin-top: 2px; letter-spacing: 0; }
+.rail nav { margin-top: 1.4rem; display: flex; flex-direction: column; gap: 1px; }
+.rail nav a {
+  color: var(--ink-soft); text-decoration: none; font-size: 13.5px;
+  padding: 5px 8px; border-radius: 2px; display: flex; gap: .6rem;
+}
+.rail nav a .n { font-family: var(--mono); font-size: 11.5px; color: var(--field); flex: none; width: 1.1rem; }
+.rail nav a:hover { color: var(--ink); }
+.rail nav a.sub { padding-left: 2.1rem; font-size: 12.5px; }
+
+main { padding: 2.2rem clamp(1.1rem, 4vw, 3.4rem) 6rem; min-width: 0; }
+section { max-width: 42rem; animation: settle .42s cubic-bezier(.2,.7,.3,1) both; }
+section.wide { max-width: 52rem; }
+@keyframes settle { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+
+h1 { font-family: var(--serif); font-weight: 600; font-size: 32px; letter-spacing: -.015em; line-height: 1.15; margin: 0 0 .3rem; text-wrap: balance; }
+h2 { font-family: var(--serif); font-weight: 600; font-size: 24px; letter-spacing: -.01em; margin: 3.4rem 0 .2rem; text-wrap: balance; scroll-margin-top: 1.5rem; }
+h2 .n { font-family: var(--mono); font-size: 15px; color: var(--field); font-weight: 500; margin-right: .6rem; }
+h3 { font-family: var(--serif); font-weight: 600; font-size: 18px; margin: 2rem 0 .1rem; }
+h2 + .rule, h1 + .rule { margin-top: .6rem; }
+.rule { border: 0; border-top: 1px solid var(--rule); margin: 1.4rem 0; transform-origin: left; animation: draw .5s ease-out both; }
+@keyframes draw { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+p { margin: .7rem 0; max-width: 40rem; }
+.lead { font-size: 16.5px; color: var(--ink); max-width: 40rem; }
+.eyebrow { font-family: var(--sans); font-size: 11.5px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--ink-soft); }
+a { color: var(--ink); text-decoration-color: var(--rule); text-underline-offset: 2px; }
+a:hover { text-decoration-color: var(--ink-soft); }
+code { font-family: var(--mono); font-size: .86em; background: color-mix(in srgb, var(--field) 9%, transparent); padding: 1px 5px; border-radius: 2px; }
+strong { font-weight: 600; }
+ul, ol { padding-left: 1.2rem; max-width: 40rem; }
+li { margin: .3rem 0; }
+li::marker { color: var(--ink-soft); }
+
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+::selection { background: color-mix(in srgb, var(--field) 22%, transparent); }
+
+pre {
+  font-family: var(--mono); font-size: 12.5px; line-height: 1.7;
+  background: var(--paper-raised); border: 1px solid var(--rule);
+  padding: .9rem 1rem; border-radius: 3px; overflow-x: auto; margin: 1rem 0;
+  max-width: 52rem;
+}
+pre .c { color: var(--ink-soft); }
+pre .k { color: var(--field); }
+pre b { color: var(--ink); font-weight: 500; }
+
+.tbl-wrap { overflow-x: auto; margin: 1.1rem 0; max-width: 52rem; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { text-align: left; vertical-align: top; padding: .5rem .8rem .5rem 0; border-bottom: 1px solid var(--rule); }
+thead th { font-weight: 600; font-size: 11.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-soft); }
+td code { white-space: nowrap; }
+.num { font-variant-numeric: tabular-nums; text-align: right; padding-right: 1.2rem; }
+
+.note { border-left: 2px solid var(--field); padding: .1rem 0 .1rem 1rem; margin: 1.2rem 0; color: var(--ink-soft); max-width: 40rem; font-size: 14px; }
+.note.warn { border-color: var(--flag); }
+.note b { color: var(--ink); }
+
+.flow { border: 1px solid var(--rule); background: var(--paper-raised); border-radius: 3px; padding: 1.4rem 1.2rem; margin: 1.4rem 0; overflow-x: auto; }
+.flow-row { display: flex; align-items: stretch; gap: 0; min-width: 40rem; }
+.node { border: 1px solid var(--ink); background: var(--paper); padding: .6rem .8rem; font-size: 12.5px; flex: 1; }
+.node .t { font-weight: 600; }
+.node .d { color: var(--ink-soft); font-size: 11.5px; margin-top: 2px; }
+.node.soft { border-color: var(--rule); }
+.arrow { flex: none; align-self: center; font-family: var(--mono); color: var(--field); padding: 0 .7rem; font-size: 14px; }
+.boundary { margin: 1rem 0 .3rem; border-top: 1px dashed var(--flag); position: relative; }
+.boundary span { position: absolute; top: -.72rem; left: 0; background: var(--paper-raised); padding-right: .5rem; font-size: 11px; color: var(--flag); font-weight: 600; letter-spacing: .04em; }
+
+.shot { border: 1px solid var(--rule); border-radius: 4px; overflow: hidden; margin: 1.2rem 0 .4rem; box-shadow: var(--shadow); background: var(--paper); max-width: 52rem; }
+.shot-bar { display: flex; align-items: center; gap: .5rem; padding: .4rem .7rem; border-bottom: 1px solid var(--rule); background: var(--paper-raised); }
+.shot-bar .dot { width: 8px; height: 8px; border-radius: 50%; border: 1px solid var(--rule); }
+.shot-bar .url { font-family: var(--mono); font-size: 11px; color: var(--ink-soft); margin-left: .4rem; }
+.shot-body { display: flex; min-height: 12rem; font-size: 12px; }
+.cap { font-size: 12px; color: var(--ink-soft); margin: 0 0 1.8rem; }
+.cap b { color: var(--ink); font-weight: 500; }
+
+.mini-rail { flex: none; width: 8.2rem; border-right: 1px solid var(--rule); padding: .6rem; background: var(--paper); }
+.mini-rail .mb { font-family: var(--serif); font-size: 12.5px; }
+.mini-rail .ms { font-size: 9.5px; color: var(--ink-soft); margin-bottom: .5rem; }
+.mini-rail a { display: block; color: var(--ink-soft); text-decoration: none; padding: 3px 5px; border-radius: 2px; font-size: 11px; }
+.mini-rail a.on { background: color-mix(in srgb, var(--field) 12%, transparent); color: var(--ink); }
+.shot-main { flex: 1; padding: .9rem 1rem; min-width: 0; overflow-x: auto; }
+.shot-h { font-family: var(--serif); font-size: 16px; }
+.shot-sub { color: var(--ink-soft); font-size: 10.5px; margin-top: 1px; }
+.btn-face { border: 1px solid var(--rule); padding: 2px 8px; font-size: 10px; display: inline-block; }
+.btn-face.go { border-color: var(--field); color: var(--field); }
+
+.dl-strip { display: flex; flex-wrap: wrap; gap: .4rem 1.6rem; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); padding: .55rem 0; margin: .7rem 0; }
+.dl-strip .t { font-size: 9.5px; color: var(--ink-soft); }
+.dl-strip .v { font-size: 12px; }
+.dl-strip .v.warn { color: var(--flag); }
+.dl-strip .delta { font-size: 9.5px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+
+table.mini { font-size: 11px; margin-top: .5rem; }
+table.mini th, table.mini td { padding: .3rem .5rem .3rem 0; }
+table.mini thead th { font-size: 9px; }
+.tag-vacant { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: var(--ink-soft); }
+.tag-vacant i { width: 15px; height: 11px; border: 1px solid var(--rule); background: var(--hatch); display: inline-block; }
+.mark-flag { color: var(--flag); font-size: 10px; font-weight: 500; display: inline-flex; align-items: center; gap: 3px; }
+.mark-flag svg { width: 9px; height: 9px; }
+.mark-degraded { color: var(--degraded); font-size: 10px; }
+
+.metrics4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: .7rem 1.2rem; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); padding: .8rem 0; margin: .7rem 0; }
+.metrics4 .fig { font-family: var(--serif); font-size: 17px; }
+.metrics4 .lbl { font-size: 9.5px; color: var(--ink-soft); margin-top: 2px; }
+.metrics4 .lbl u { text-decoration-style: dotted; text-decoration-color: var(--rule); text-underline-offset: 2px; }
+
+.timeline { display: flex; height: 1.6rem; border: 1px solid var(--rule); overflow: hidden; margin-top: .5rem; }
+.timeline div { display: flex; align-items: center; justify-content: center; font-size: 9px; border-right: 1px solid var(--paper); }
+.timeline .occ { background: var(--field); color: var(--paper); }
+.timeline .vac { background: var(--hatch); color: var(--ink-soft); }
+
+.sched { display: grid; grid-template-columns: 5.5rem repeat(10, 1fr); font-size: 9px; border: 1px solid var(--rule); border-right: 0; border-bottom: 0; min-width: 30rem; }
+.sched > div { border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); padding: 3px 4px; }
+.sched .hd { color: var(--ink-soft); text-align: center; }
+.sched .row-h { color: var(--ink); }
+.sched .cell.occ { background: color-mix(in srgb, var(--field) 14%, transparent); }
+.sched .cell.vac { background: var(--hatch); }
+.sched .cell.sel { outline: 2px solid var(--ink); outline-offset: -2px; }
+
+.editor { display: flex; gap: .8rem; flex-wrap: wrap; }
+.editor .canvas { flex: none; width: 15rem; aspect-ratio: 16/9; border: 1px solid var(--rule); background: var(--paper-raised); }
+.editor .side { font-size: 10.5px; color: var(--ink-soft); flex: 1; min-width: 12rem; }
+.editor .side .btn { border: 1px solid var(--rule); padding: 2px 7px; display: inline-block; margin: 0 4px 4px 0; font-size: 10px; color: var(--ink); }
+
+.pager { border: 1px solid var(--rule); background: var(--paper-raised); padding: 1rem 1.1rem; font-size: 11px; max-width: 22rem; }
+.pager h4 { font-family: var(--serif); font-size: 15px; margin: 0; }
+.pager .big { font-family: var(--serif); font-size: 30px; margin: .4rem 0 .1rem; }
+.pager .bars { display: flex; align-items: flex-end; gap: 2px; height: 3rem; margin: .7rem 0; }
+.pager .bars i { flex: 1; background: var(--field); }
+.pager .bars i.flag { background: var(--flag); }
+.pager .foot { color: var(--ink-soft); font-size: 9.5px; border-top: 1px solid var(--rule); margin-top: .6rem; padding-top: .4rem; }
+
+.frow { display: flex; gap: .6rem; align-items: center; border-bottom: 1px solid var(--rule); padding: .4rem 0; font-size: 11px; }
+.frow .k { color: var(--ink-soft); width: 7rem; flex: none; }
+.frow .pill { border: 1px solid var(--rule); padding: 1px 6px; font-size: 10px; }
+.frow .pill.ok { color: var(--field); border-color: color-mix(in srgb, var(--field) 40%, var(--rule)); }
+
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem 2rem; max-width: 52rem; align-items: start; }
+@media (max-width: 900px) {
+  .wrap { grid-template-columns: 1fr; }
+  .rail { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--rule); }
+  .rail nav { display: grid; grid-template-columns: repeat(2, 1fr); }
+  .two-col { grid-template-columns: 1fr; }
+  .metrics4 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; }
+  html { scroll-behavior: auto; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+<aside class="rail">
+  <div class="brand">WhaleTale<span>operations handbook</span></div>
+  <nav>
+    <a href="#what"><span class="n">1</span> What it is</a>
+    <a href="#architecture"><span class="n">2</span> Architecture</a>
+    <a href="#running"><span class="n">3</span> Running it</a>
+    <a href="#running-edge" class="sub">Edge box</a>
+    <a href="#running-cloud" class="sub">Cloud</a>
+    <a href="#running-web" class="sub">Console</a>
+    <a href="#bringup" class="sub">Bring-up order</a>
+    <a href="#console"><span class="n">4</span> Using the console</a>
+    <a href="#admin"><span class="n">5</span> Fleet admin</a>
+    <a href="#stats"><span class="n">6</span> The statistics</a>
+    <a href="#edgecases"><span class="n">7</span> Edge-case behaviour</a>
+    <a href="#systems"><span class="n">8</span> Supported systems</a>
+  </nav>
+</aside>
+
+<main>
+
+<section id="what">
+  <p class="eyebrow">Reference</p>
+  <h1>WhaleTale operations handbook</h1>
+  <hr class="rule">
+  <p class="lead">WhaleTale turns a property's existing security cameras into per-space
+  foot-traffic data, so the operator of a multi-tenant space (a market, a food hall, an
+  antique mall, mixed-use retail) can price it, fill it, and prove its value to
+  tenants.</p>
+  <p><strong>Video never leaves the property.</strong> An on-prem edge box decodes the
+  camera streams, runs person detection, applies zone logic, and writes counts to a
+  local database. Only kilobyte aggregates sync to the cloud. No frames, crops,
+  embeddings, or movement paths are ever stored or transmitted.</p>
+  <p>This handbook covers a single-site install: one edge box on the property, a cloud
+  instance, and the operator console, connected over a private Tailscale network with
+  no public ingress. It documents how to run each part, how to use every screen, what
+  each statistic means, and exactly what the system does in the failure scenarios that
+  decide whether an operator still trusts it in month six.</p>
+  <p class="note"><b>About the interface renderings.</b> The console is a Next.js app
+  you run locally against your cloud API. It is not hosted. The screens below are
+  faithful renderings built from the product's own design system (see
+  <code>DESIGN.md</code>) and the current build, using the demo site's data. They show
+  layout and content, not live pixels.</p>
+</section>
+
+<section id="architecture">
+  <h2><span class="n">2</span> Architecture and data flow</h2>
+  <hr class="rule">
+  <p>Three surfaces. The edge box is the only place video exists. Everything downstream
+  works from 15-minute numeric rollups.</p>
+
+  <div class="flow">
+    <div class="flow-row">
+      <div class="node"><div class="t">Cameras</div><div class="d">ONVIF / RTSP, on the property LAN</div></div>
+      <div class="arrow">&rarr;</div>
+      <div class="node"><div class="t">Edge box</div><div class="d">decode &middot; detect &middot; track &middot; zones &middot; count, then SQLite</div></div>
+      <div class="arrow">&rarr;</div>
+      <div class="node soft"><div class="t">Sync</div><div class="d">watermark push of rollups, plus heartbeat</div></div>
+    </div>
+    <div class="boundary"><span>property boundary. nothing above this line leaves the building</span></div>
+    <div class="flow-row" style="margin-top:1.3rem">
+      <div class="node"><div class="t">Cloud API</div><div class="d">FastAPI &middot; ingest, operator, admin, Stripe webhook</div></div>
+      <div class="arrow">&rarr;</div>
+      <div class="node"><div class="t">Postgres 16</div><div class="d">observations, tenancies, zone versions, alerts</div></div>
+      <div class="arrow">&rarr;</div>
+      <div class="node soft"><div class="t">Consumers</div><div class="d">operator console &middot; report PDF &middot; fleet admin</div></div>
+    </div>
+  </div>
+
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Surface</th><th>Stack</th><th>Who uses it</th></tr></thead>
+    <tbody>
+      <tr><td><code>edge/</code></td><td>Python 3.12, PyAV, RT-DETR, Norfair, Shapely, SQLite (WAL)</td><td>Runs unattended on the property. You touch it at install and after a camera move.</td></tr>
+      <tr><td><code>cloud/</code></td><td>Python 3.12, FastAPI, SQLAlchemy 2, Alembic, Postgres 16, WeasyPrint</td><td>One instance per deployment. Holds the history, renders reports, evaluates fleet health.</td></tr>
+      <tr><td><code>web/</code></td><td>Next.js 15 (App Router), TypeScript, Tailwind v4, Auth.js</td><td>The property manager, the person who prices space and signs tenants. Light theme only, by design: a daytime back-office tool.</td></tr>
+      <tr><td><code>/admin/*</code></td><td>JSON API on the same FastAPI app</td><td>WhaleTale staff, or you helping remotely. Fleet health and alerts. No UI.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="running" class="wide">
+  <h2><span class="n">3</span> Running it</h2>
+  <hr class="rule">
+  <p><strong>Prerequisites.</strong> <a href="https://docs.astral.sh/uv/">uv</a> (pins and
+  fetches Python 3.12), <code>pnpm</code> and Node for the console, Docker for a local
+  Postgres, and the camera onboarding tools if you use ONVIF discovery. PDF rendering
+  needs <code>libpango-1.0-0 libpangoft2-1.0-0</code> on the cloud host.</p>
+
+  <h3 id="running-edge">Edge box</h3>
+  <p>Onboard each camera first. The gate checks the stream opens, its resolution and
+  decode FPS, and a timed test inference, then prints a <code>site.json</code> block
+  with the RTSP credentials sealed (key derived from <code>WHALETALE_SITE_SECRET</code>).</p>
+<pre><span class="c"># discover cameras on the LAN, or validate and emit a config block</span>
+<b>uv run whaletale-onboard --discover</b>
+<b>uv run whaletale-onboard --source</b> rtsp://u:p@cam/stream1 <b>--name</b> front-hall <b>--emit</b>
+</pre>
+  <p>Assemble <code>site.json</code> from those blocks. It is never committed, because it
+  carries the pairing token and the sealed credentials. Each zone carries its cloud
+  <code>zone_version_id</code>; a zone with <code>"excluded": true</code> is a staff-only
+  mask, not a counting zone. Then run the agent and the sync client, usually two
+  systemd units from <code>edge/deploy/</code>.</p>
+<pre><b>uv run whaletale-agent --config</b> site.json                 <span class="c"># the capture and count daemon</span>
+<b>uv run whaletale-agent --config</b> site.json <b>--warm</b>          <span class="c"># load the model, exit (first-run cache)</span>
+<b>uv run whaletale-agent --config</b> site.json <b>--recalibrate</b>   <span class="c"># re-capture drift references after moving a camera</span>
+<b>uv run whaletale-sync   --config</b> site.json <b>--once</b>          <span class="c"># push the buffered backlog once</span>
+<b>uv run whaletale-sync   --config</b> site.json <b>--interval</b> 60   <span class="c"># loop: push and heartbeat every 60s</span>
+<b>uv run whaletale-sync   --config</b> site.json <b>--dry-run</b>       <span class="c"># print the pending payload, send nothing</span>
+</pre>
+  <div class="note"><b>The agent and the sync client must share <code>EDGE_SQLITE_PATH</code>.</b>
+  The agent writes rollups and per-camera health there; the sync client reads them into
+  the heartbeat. Point them at different files and the fleet view goes blank.</div>
+
+  <p class="eyebrow" style="margin-top:1.6rem">Edge environment</p>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Variable</th><th>Default</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><code>EDGE_SQLITE_PATH</code></td><td class="num">./edge_local.db</td><td>Local rollup buffer (WAL). Shared by agent and sync.</td></tr>
+      <tr><td><code>EDGE_TARGET_FPS</code></td><td class="num">4</td><td>Frames per second per camera after decimation.</td></tr>
+      <tr><td><code>EDGE_INFERENCE_DEVICE</code></td><td class="num">cpu</td><td><code>cpu</code> or <code>cuda</code>.</td></tr>
+      <tr><td><code>EDGE_MIN_DWELL_SECONDS</code></td><td class="num">3</td><td>Seconds inside a zone before it counts as an entry (suppresses jitter).</td></tr>
+      <tr><td><code>EDGE_EXIT_MARGIN_FRAC</code></td><td class="num">0.02</td><td>Exit hysteresis: a separate leave threshold, so loitering on the line does not flicker.</td></tr>
+      <tr><td><code>EDGE_CATCHMENT_FRAC</code></td><td class="num">0.08</td><td>Passerby catchment: how far the polygon dilates for the "came near but did not enter" test.</td></tr>
+      <tr><td><code>EDGE_REENTRY_SECONDS</code> / <code>_DISTANCE</code></td><td class="num">2 / 0.06</td><td>Occlusion grace: a fresh track this close in time and space to a just-dropped one inherits its visit instead of counting again. Either at 0 disables.</td></tr>
+      <tr><td><code>EDGE_FROZEN_FRAME_SECONDS</code></td><td class="num">30</td><td>Byte-identical frames for this long: the source is treated as offline.</td></tr>
+      <tr><td><code>EDGE_REF_DIR</code></td><td class="num">&lt;db dir&gt;/refframes</td><td>Where per-camera drift reference hashes live. On the box only, never synced.</td></tr>
+      <tr><td><code>EDGE_RECALIBRATION_CHECK_SECONDS</code></td><td class="num">3600</td><td>How often the live view is hashed against its reference.</td></tr>
+      <tr><td><code>EDGE_DRIFT_HAMMING_THRESHOLD</code> / <code>_SAMPLES</code></td><td class="num">12 / 2</td><td>Bits (of 64) the hash may differ, and how many hourly checks in a row, before a camera is flagged <code>needs_recalibration</code> and counting for it stops.</td></tr>
+      <tr><td><code>EDGE_BUCKET_SECONDS</code></td><td class="num">900</td><td>Rollup width. 15 minutes is the foot-traffic granularity.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3 id="running-cloud">Cloud</h3>
+<pre><b>docker compose -f</b> docker/compose.cloud.yml <b>up -d</b>      <span class="c"># Postgres and Redis</span>
+<b>cd</b> cloud &amp;&amp; <b>uv sync</b>
+<b>uv run alembic upgrade head</b>                             <span class="c"># apply migrations</span>
+DATABASE_URL=postgresql+psycopg://&hellip; <b>uv run whaletale-api --port</b> 8000
+<b>uv run whaletale-report --seed --out</b> report              <span class="c"># one-pager: report.html and report.pdf</span>
+</pre>
+  <p>The one FastAPI app serves four route groups: <code>/v1/ingest</code> and
+  <code>/v1/heartbeat</code> for edge boxes (pairing-token auth), <code>/v1/*</code> for
+  the operator console (hashed bearer per operator, scoped to their sites),
+  <code>/admin/*</code> for fleet staff (single <code>WHALETALE_ADMIN_TOKEN</code>), and
+  <code>/webhooks/stripe</code> (signature-verified). Every response carries HSTS,
+  <code>nosniff</code>, <code>X-Frame-Options: DENY</code>, and a locked-down CSP. After
+  ten failed auth attempts from one IP in fifteen minutes, that IP is locked out for the
+  window; every auth failure, permission denial, and admin action is one line on the
+  <code>whaletale.security</code> logger.</p>
+
+  <p class="eyebrow" style="margin-top:1.6rem">Cloud environment</p>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Variable</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><code>DATABASE_URL</code></td><td>Postgres DSN. The app's DB user needs only DML on its own tables.</td></tr>
+      <tr><td><code>WHALETALE_ADMIN_TOKEN</code></td><td>Bearer for <code>/admin/*</code>. Unset disables the fleet API entirely.</td></tr>
+      <tr><td><code>WHALETALE_BASELINE_WEEKS</code> / <code>_ANOMALY_SIGMA</code></td><td>Trailing window (4) and SD threshold (2) for the "against itself" comparison and anomaly flagging.</td></tr>
+      <tr><td><code>SENTRY_DSN</code></td><td>Optional. Exceptions only; inert unless set.</td></tr>
+      <tr><td><code>STRIPE_SECRET_KEY</code> / <code>_WEBHOOK_SECRET</code> / <code>_PRICE_ID</code></td><td>Per-camera recurring billing. Quantity is always recomputed server-side from the live camera count.</td></tr>
+      <tr><td><code>WHALETALE_BILLING_GRACE_DAYS</code> / <code>_EXPORT_DAYS</code></td><td>Grace before the console goes read-only after a failed payment (7); export window after a cancel (30).</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3 id="running-web">Console</h3>
+<pre><b>cd</b> web &amp;&amp; <b>pnpm install</b>
+<b>cp</b> .env.example .env.local        <span class="c"># set AUTH_SECRET and WHALETALE_API_URL</span>
+<b>pnpm dev</b>                          <span class="c"># http://localhost:3000, needs whaletale-api up</span>
+<b>pnpm build &amp;&amp; pnpm start</b>          <span class="c"># production</span>
+</pre>
+  <p>Sign in with an operator email and API token. Create the operator on the cloud with
+  <code>create_operator_user(session, email, [site_id])</code>; it returns the raw token
+  once. The console verifies the token by calling <code>GET /v1/sites</code> and carries
+  it on the session. It never reaches the browser bundle.</p>
+
+  <h3 id="bringup">Bring-up order for one site</h3>
+  <ol>
+    <li>Cloud up: Postgres, <code>alembic upgrade head</code>, <code>whaletale-api</code> reachable over Tailscale.</li>
+    <li>Create the site, its spaces, and a first zone version per space in the database, or via the console once a space exists.</li>
+    <li>Pair the edge box from the console's <strong>Settings</strong> screen, and copy the token (shown once) into <code>site.json</code>.</li>
+    <li>Onboard each camera (<code>whaletale-onboard</code>), add it in <strong>Settings</strong>, and paste the emitted zone blocks into <code>site.json</code>. Draw an <code>excluded</code> zone over any staff-only area now.</li>
+    <li>Start <code>whaletale-agent</code>. It captures a drift reference for each camera on its first check.</li>
+    <li>Start <code>whaletale-sync --interval 60</code>. Rollups and heartbeats begin flowing.</li>
+    <li>Create the operator user, sign into the console, confirm the <strong>Overview</strong> health strip shows the box reporting and no cameras offline.</li>
+    <li>Set up the Stripe subscription for the site if billing is in use; the camera count drives the quantity.</li>
+  </ol>
+</section>
+
+<section id="console" class="wide">
+  <h2><span class="n">4</span> Using the console</h2>
+  <hr class="rule">
+  <p>Six sections in the left rail, plus a metric glossary every figure links to. The
+  operator's job is to price space, fill it, and hand tenants proof. The screens are
+  ordered for that.</p>
+
+  <h3>Sign in</h3>
+  <div class="shot" style="max-width:24rem">
+    <div class="shot-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:3000/sign-in</span></div>
+    <div class="shot-body" style="min-height:auto">
+      <div class="shot-main">
+        <div class="shot-h">WhaleTale</div>
+        <div class="shot-sub">Operator sign-in</div>
+        <div class="frow"><span class="k">Email</span><span>manager@cedarstreet.market</span></div>
+        <div class="frow"><span class="k">API token</span><span style="font-family:var(--mono)">&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;</span></div>
+        <div style="margin-top:.6rem"><span class="btn-face go">Continue</span></div>
+      </div>
+    </div>
+  </div>
+  <p class="cap">Email plus operator token. The token is verified against the API before the session is issued.</p>
+
+  <h3>Overview</h3>
+  <div class="shot">
+    <div class="shot-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:3000/</span></div>
+    <div class="shot-body">
+      <div class="mini-rail">
+        <div class="mb">WhaleTale</div><div class="ms">Cedar Street Market</div>
+        <a class="on">Overview</a><a>Schedule</a><a>Spaces</a><a>Occupants</a><a>Reports</a><a>Settings</a>
+      </div>
+      <div class="shot-main">
+        <div class="shot-h">Overview</div>
+        <div class="shot-sub">Mon Jun 2 &ndash; Sun Jun 8 &middot; America/Chicago</div>
+        <div class="dl-strip">
+          <div><div class="t">SITE ENTRIES</div><div class="v">3,481 entries <span class="delta">+6%</span></div></div>
+          <div><div class="t">EDGE BOXES</div><div class="v">1 of 1 reporting</div></div>
+          <div><div class="t">CAMERAS OFFLINE</div><div class="v warn">cam-c <span class="mark-flag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"><path d="M13.73 4a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/></svg> attention</span></div></div>
+          <div><div class="t">VACANT SPACES</div><div class="v">1 of 6</div></div>
+        </div>
+        <div style="font-family:var(--serif);font-size:13px;margin-top:.4rem">Spaces by capture rate</div>
+        <table class="mini">
+          <thead><tr><th>Space</th><th>Occupant</th><th class="num">Entries</th><th class="num">Capture</th><th class="num">vs prior</th></tr></thead>
+          <tbody>
+            <tr><td>Stall 1 <span style="color:var(--ink-soft)">stall</span></td><td>Rosa's Tamales</td><td class="num">612</td><td class="num">71%</td><td class="num" style="color:var(--ink-soft)">+9%</td></tr>
+            <tr><td>Stall 2 <span style="color:var(--ink-soft)">stall</span></td><td>Nguyen Ceramics</td><td class="num">418</td><td class="num">64%</td><td class="num" style="color:var(--ink-soft)">&minus;3%</td></tr>
+            <tr><td>Patio 1 <span style="color:var(--ink-soft)">patio</span></td><td>Vetiver &amp; Ash</td><td class="num">377</td><td class="num">58%</td><td class="num" style="color:var(--ink-soft)">+14%</td></tr>
+            <tr><td>Stall 6 <span style="color:var(--ink-soft)">stall</span></td><td><span class="tag-vacant"><i></i> vacant</span></td><td class="num">201</td><td class="num">31%</td><td class="num" style="color:var(--ink-soft)">new</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <p class="cap"><b>What you do here:</b> the health strip is the first thing you scan: box reporting, any camera offline, how many spaces sit vacant. The table ranks every space by capture rate, because that is the number that separates a good tenant from a good location. A stall on a dead corridor pulling 71% is a strong tenant in a weak spot.</p>
+
+  <h3>Schedule</h3>
+  <div class="shot">
+    <div class="shot-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:3000/schedule</span></div>
+    <div class="shot-body">
+      <div class="mini-rail"><div class="mb">WhaleTale</div><div class="ms">Cedar Street Market</div><a>Overview</a><a class="on">Schedule</a><a>Spaces</a><a>Occupants</a><a>Reports</a><a>Settings</a></div>
+      <div class="shot-main">
+        <div class="shot-h">Schedule</div>
+        <div class="shot-sub">Jun 2 &ndash; Jun 15. Click a cell, shift-click a block, then assign an occupant.</div>
+        <div class="sched" style="margin-top:.6rem">
+          <div class="hd"></div><div class="hd">M2</div><div class="hd">T3</div><div class="hd">W4</div><div class="hd">T5</div><div class="hd">F6</div><div class="hd">S7</div><div class="hd">S8</div><div class="hd">M9</div><div class="hd">T10</div><div class="hd">W11</div>
+          <div class="row-h">Stall 1</div><div class="cell occ"></div><div class="cell occ"></div><div class="cell occ"></div><div class="cell occ"></div><div class="cell occ"></div><div class="cell occ"></div><div class="cell occ"></div><div class="cell occ"></div><div class="cell occ"></div><div class="cell occ"></div>
+          <div class="row-h">Stall 2</div><div class="cell occ"></div><div class="cell occ"></div><div class="cell occ"></div><div class="cell occ"></div><div class="cell occ"></div><div class="cell occ"></div><div class="cell occ"></div><div class="cell occ"></div><div class="cell occ"></div><div class="cell occ"></div>
+          <div class="row-h">Stall 3</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell occ"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+          <div class="row-h">Stall 5</div><div class="cell sel"></div><div class="cell sel"></div><div class="cell sel"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+          <div class="row-h">Stall 6</div><div class="cell vac"></div><div class="cell vac"></div><div class="cell vac"></div><div class="cell vac"></div><div class="cell vac"></div><div class="cell vac"></div><div class="cell vac"></div><div class="cell vac"></div><div class="cell vac"></div><div class="cell vac"></div>
+        </div>
+        <div style="font-size:10px;color:var(--ink-soft);margin-top:.5rem">Assign panel: permanent &middot; recurring (a weekday picker builds <span style="font-family:var(--mono)">FREQ=WEEKLY;BYDAY=SA</span>) &middot; one-off. A conflicting range comes back naming both tenancies.</div>
+      </div>
+    </div>
+  </div>
+  <p class="cap"><b>What you do here:</b> paint who holds which space on which days. Stall 3 is a Saturday-only market stand (recurring). Stall 6 is genuinely vacant, shown hatched, because "no tenant" is real information rather than missing data. Overlapping tenancies are rejected on save and the conflict is shown; a recurring tenancy on a day the venue was closed is suppressed automatically.</p>
+
+  <h3>Space detail, the statistics</h3>
+  <div class="shot">
+    <div class="shot-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:3000/spaces/rosas-tamales</span></div>
+    <div class="shot-body">
+      <div class="mini-rail"><div class="mb">WhaleTale</div><div class="ms">Cedar Street Market</div><a>Overview</a><a>Schedule</a><a class="on">Spaces</a><a>Occupants</a><a>Reports</a><a>Settings</a></div>
+      <div class="shot-main">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div><div class="shot-h">Stall 1</div><div class="shot-sub">stall &middot; Rosa's Tamales</div></div>
+          <div><span class="btn-face">Edit zone</span> <span class="btn-face">Report (PDF)</span></div>
+        </div>
+        <div class="shot-sub" style="margin-top:.4rem">Jun 2 &ndash; Jun 8 &middot; stall &middot; <span class="mark-degraded">2 degraded</span> &nbsp;<span class="mark-degraded">1 low-confidence</span></div>
+        <div class="metrics4">
+          <div><div class="fig">612</div><div class="lbl"><u>entries</u> &middot; Jun 2&ndash;8 <span class="mark-flag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"><path d="M13.73 4a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/></svg></span></div></div>
+          <div><div class="fig">18%</div><div class="lbl"><u>traffic share</u> &middot; Jun 2&ndash;8</div></div>
+          <div><div class="fig">71%</div><div class="lbl"><u>capture rate</u> &middot; rank 1 of 6 stalls</div></div>
+          <div><div class="fig">2m 40s</div><div class="lbl"><u>median dwell</u> &middot; Jun 2&ndash;8</div></div>
+        </div>
+        <div style="font-family:var(--serif);font-size:13px;margin-top:.6rem">Who held this space</div>
+        <div class="timeline"><div class="occ" style="flex:5">Rosa's Tamales</div><div class="vac" style="flex:1">vacant</div><div class="occ" style="flex:2">Rosa's Tamales</div></div>
+      </div>
+    </div>
+  </div>
+  <p class="cap"><b>What you do here:</b> this is the tenant conversation. Every figure carries its unit and period and links to its definition. The triangle mark means the entry count is more than two SD above this space's own trailing baseline for the same weekday and hours, like a festival Saturday: flagged, never silently averaged in. "2 degraded" means two 15-minute buckets fell back to a secondary camera; "1 low-confidence" means one bucket ran below this camera's normal detection confidence (low light or glare), so treat those counts as a floor.</p>
+
+  <h3>Zone editor</h3>
+  <div class="shot">
+    <div class="shot-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:3000/spaces/rosas-tamales/zone</span></div>
+    <div class="shot-body">
+      <div class="mini-rail"><div class="mb">WhaleTale</div><div class="ms">Cedar Street Market</div><a>Overview</a><a>Schedule</a><a class="on">Spaces</a><a>Occupants</a><a>Reports</a><a>Settings</a></div>
+      <div class="shot-main">
+        <div class="shot-h">Zone &middot; Stall 1</div>
+        <div class="shot-sub">Click to add a point, drag to move, double-click to delete. Points snap. Coordinates are normalized.</div>
+        <div class="editor" style="margin-top:.6rem">
+          <svg class="canvas" viewBox="0 0 100 56" preserveAspectRatio="none" aria-label="Zone polygon editor">
+            <g stroke="var(--rule)" stroke-width="0.2">
+              <line x1="25" y1="0" x2="25" y2="56"></line><line x1="50" y1="0" x2="50" y2="56"></line><line x1="75" y1="0" x2="75" y2="56"></line>
+              <line x1="0" y1="18" x2="100" y2="18"></line><line x1="0" y1="37" x2="100" y2="37"></line>
+            </g>
+            <polygon points="30,20 70,20 78,50 22,50" fill="color-mix(in srgb, var(--field) 16%, transparent)" stroke="var(--field)" stroke-width="0.6"></polygon>
+            <g fill="var(--field)" stroke="var(--paper)" stroke-width="0.5">
+              <circle cx="30" cy="20" r="1.6"></circle><circle cx="70" cy="20" r="1.6"></circle><circle cx="78" cy="50" r="1.6"></circle><circle cx="22" cy="50" r="1.6"></circle>
+            </g>
+          </svg>
+          <div class="side">
+            <span class="btn">Undo</span><span class="btn">Redo</span><span style="font-family:var(--mono)">4 points</span>
+            <p style="margin:.6rem 0 0">Save creates version <b>N</b>. Reports before today keep version <b>N&minus;1</b>; geometry is never edited in place.</p>
+            <p style="color:var(--flag);margin:.5rem 0 0">This zone overlaps <b>Patio 1</b> on the same camera. Set a parent/child relation, or "Save with the overlap".</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="cap"><b>What you do here:</b> draw the polygon the space is counted by, over a reference frame from the camera. Fewer than three points, a self-intersecting shape, or points outside the frame are refused. Two zones overlapping on one camera is allowed (a table inside a patio) but you have to confirm it. If another operator reshaped the same zone while you were editing, the save is refused and you reload.</p>
+
+  <h3>Reports</h3>
+  <div class="two-col">
+    <div>
+      <div class="shot" style="box-shadow:none">
+        <div class="shot-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:3000/reports</span></div>
+        <div class="shot-body" style="min-height:auto">
+          <div class="shot-main">
+            <div class="shot-h">Reports</div>
+            <div class="shot-sub">One-page PDF per space, for the current period.</div>
+            <div class="frow"><span>Stall 1 &middot; Rosa's Tamales</span><span style="margin-left:auto;color:var(--field)">PDF &rarr;</span></div>
+            <div class="frow"><span>Stall 2 &middot; Nguyen Ceramics</span><span style="margin-left:auto;color:var(--field)">PDF &rarr;</span></div>
+            <div class="frow"><span>Patio 1 &middot; Vetiver &amp; Ash</span><span style="margin-left:auto;color:var(--field)">PDF &rarr;</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="pager">
+      <h4>Stall 1, Cedar Street Market</h4>
+      <div class="shot-sub">Jun 2 &ndash; Jun 8, 2026 &middot; Rosa's Tamales</div>
+      <div class="big">612 <span style="font-size:12px;color:var(--ink-soft)">entries</span></div>
+      <div style="color:var(--ink-soft)">71% capture &middot; 18% of site traffic &middot; median dwell 2m 40s</div>
+      <div class="bars"><i style="height:30%"></i><i style="height:45%"></i><i style="height:70%"></i><i style="height:95%"></i><i class="flag" style="height:100%"></i><i style="height:60%"></i><i style="height:40%"></i></div>
+      <div style="color:var(--ink-soft);font-size:9.5px">Entries by hour. Sat 11am bar flagged: 2.8 SD above baseline (Farmers' Market).</div>
+      <div class="foot">2 buckets fell back to a secondary camera. 1 bucket ran below the camera's normal confidence; treat those counts as a floor. Generated 2026&#8209;06&#8209;09 08:14 UTC.</div>
+    </div>
+  </div>
+  <p class="cap"><b>What you do here:</b> hand a tenant or a prospect the one-pager. Server-rendered SVG charts, flat ink, the anomalous bar in the correction-mark red, an honest footnote for any degraded or low-confidence interval.</p>
+
+  <h3>Occupants and Settings</h3>
+  <div class="two-col">
+    <div class="shot" style="box-shadow:none">
+      <div class="shot-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">/occupants</span></div>
+      <div class="shot-body" style="min-height:auto"><div class="shot-main">
+        <div class="shot-h">Occupants</div>
+        <div class="frow"><span>Rosa's Tamales</span><span style="margin-left:auto;color:var(--ink-soft)">Stall 1</span></div>
+        <div class="frow"><span>Nguyen Ceramics</span><span style="margin-left:auto;color:var(--ink-soft)">Stall 2</span></div>
+        <div class="frow"><span>Vetiver &amp; Ash</span><span style="margin-left:auto;color:var(--ink-soft)">Patio 1</span></div>
+        <div style="font-size:10px;color:var(--ink-soft);margin-top:.4rem">Records are referenced, never copied, so a rename updates every report.</div>
+      </div></div>
+    </div>
+    <div class="shot" style="box-shadow:none">
+      <div class="shot-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">/settings</span></div>
+      <div class="shot-body" style="min-height:auto"><div class="shot-main">
+        <div class="shot-h">Settings</div>
+        <div class="frow"><span class="k">Edge box</span><span>box-1</span><span class="pill ok" style="margin-left:auto">paired</span></div>
+        <div class="frow"><span class="k">Cameras</span><span>cam-a, cam-b, cam-c</span></div>
+        <div class="frow"><span class="k">Billing</span><span>3 cameras billed</span><span class="pill" style="margin-left:auto">3 live</span></div>
+        <div style="font-size:10px;color:var(--ink-soft);margin-top:.4rem">Add a camera, preview the prorated change, confirm. Pairing token shown once.</div>
+      </div></div>
+    </div>
+  </div>
+  <p class="cap"><b>Occupants</b> are the tenant identities the schedule points at. <b>Settings</b> pairs the edge box (token shown once), registers cameras, and shows billing: billed count against live count, with a prorated preview you confirm before anything is charged. If payment lapses past the grace window the console goes read-only; the edge box keeps collecting the whole time.</p>
+</section>
+
+<section id="admin" class="wide">
+  <h2><span class="n">5</span> Fleet admin</h2>
+  <hr class="rule">
+  <p>WhaleTale staff, or you helping from a distance. A JSON API, no UI, authed with the
+  single <code>WHALETALE_ADMIN_TOKEN</code>. <code>GET /admin/fleet</code> is the live
+  health view; <code>POST /admin/fleet/evaluate</code> persists the current alert set
+  into the <code>alerts</code> table (run it on a schedule);
+  <code>GET /admin/alerts?audience=&amp;include_resolved=</code> lists them.</p>
+<pre><span class="c"># GET /admin/fleet  (Authorization: Bearer $WHALETALE_ADMIN_TOKEN)</span>
+[{ <span class="k">"site_name"</span>: <b>"Cedar Street Market"</b>, <span class="k">"state"</span>: <b>"degraded"</b>,
+   <span class="k">"boxes"</span>: [{ <span class="k">"name"</span>: <b>"box-1"</b>, <span class="k">"online"</span>: <b>true</b>, <span class="k">"agent_version"</span>: <b>"0.10.0"</b>,
+                <span class="k">"disk_free_fraction"</span>: <b>0.41</b>, <span class="k">"buckets_pending_sync"</span>: <b>0</b> }],
+   <span class="k">"alerts"</span>: [
+     { <span class="k">"kind"</span>: <b>"camera_moved"</b>,    <span class="k">"audience"</span>: <b>"customer"</b>, <span class="k">"subject"</span>: <b>"cam-c"</b>,
+       <span class="k">"message"</span>: <b>"Camera cam-c looks like it moved or was re-aimed. Counts for it are paused."</b> },
+     { <span class="k">"kind"</span>: <b>"low_confidence"</b>,  <span class="k">"audience"</span>: <b>"us"</b>,       <span class="k">"subject"</span>: <b>"cam-b"</b>,
+       <span class="k">"message"</span>: <b>"cam-b detection confidence 0.41 is well below its baseline 0.78."</b> }
+   ]}]
+</pre>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Alert</th><th>Condition</th><th>Audience</th></tr></thead>
+    <tbody>
+      <tr><td><code>camera_dark</code></td><td>A camera reported no frame for more than 1 h.</td><td>customer</td></tr>
+      <tr><td><code>camera_moved</code></td><td>Perceptual-hash drift past threshold; counting for that camera is paused.</td><td>customer</td></tr>
+      <tr><td><code>low_confidence</code></td><td>Mean detection confidence more than 30% below the camera's own baseline (IR, sun, dirt).</td><td>us</td></tr>
+      <tr><td><code>disk_low</code></td><td>Edge box has less than 20% disk free.</td><td>us</td></tr>
+      <tr><td><code>sync_stale</code></td><td>No successful sync for more than 6 h.</td><td>us</td></tr>
+      <tr><td><code>agent_behind</code></td><td>Edge agent version older than the current release.</td><td>us</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">Customer-audience alerts currently surface only through
+  <code>/admin/*</code>. An operator-facing alerts endpoint and a console banner are a
+  separate piece of work; today the health strip on <strong>Overview</strong> is the
+  operator's at-a-glance signal.</p>
+</section>
+
+<section id="stats" class="wide">
+  <h2><span class="n">6</span> The statistics</h2>
+  <hr class="rule">
+  <p>These definitions are canonical (<code>docs/metrics.md</code>, spec &sect;6.4). The
+  console links every label to them. They are computed on the edge per 15-minute bucket
+  and re-derived in the cloud over synced <code>observations</code>, joined to tenancies
+  at query time so a schedule corrected weeks late fixes all history.</p>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Metric</th><th>Definition</th><th>What "good" looks like</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Entry</strong></td><td>A tracked person's <em>ground point</em> (bottom-centre of the box, never the centre) crosses from outside to inside the zone polygon and stays in for at least <code>min_dwell_seconds</code>. Separate enter and exit thresholds keep a boundary loiterer from flickering.</td><td>Rises on weekends and events; the anomaly flag catches the rest.</td></tr>
+      <tr><td><strong>Capture rate</strong></td><td><code>entries / (entries + passersby)</code>. A passerby reaches the zone's catchment but never the polygon.</td><td>The headline number. High capture in a low-traffic spot is a strong tenant in a weak location, and that is the pricing insight.</td></tr>
+      <tr><td><strong>Traffic share</strong></td><td>Zone entries divided by total people at the site for the same bucket.</td><td>Survives busy days and slow days; use it to compare spaces fairly.</td></tr>
+      <tr><td><strong>Dwell</strong></td><td>Per-track seconds inside, as median and p90, never a mean (one bag left in frame ruins a mean). The period figure is entries-weighted across buckets, labelled <code>_est</code>.</td><td>Longer at seating and browsing spaces, short at pass-through.</td></tr>
+      <tr><td><strong>Occupied seconds</strong></td><td>Wall-clock seconds with at least one person inside. Not a sum over people.</td><td>Utilisation, distinct from <em>person-seconds</em> (computed on the edge, not synced).</td></tr>
+      <tr><td><strong>Peak occupancy</strong></td><td>Max concurrent people inside during the bucket.</td><td>Capacity planning; catches surges an average hides.</td></tr>
+    </tbody>
+  </table></div>
+  <h3>Normalization and flags</h3>
+  <p>Every reported figure carries three comparisons: <strong>share of site</strong>,
+  <strong>against itself</strong> (same weekday, trailing four weeks, same hours), and
+  <strong>against peer zones of the same kind</strong>. Weekday-to-weekday is never the
+  default. A day more than two SD from its trailing baseline is <strong>anomalous</strong>:
+  surfaced with its annotation (a festival, a closure), never silently excluded. A
+  bucket the primary camera missed and a secondary stood in for is <strong>degraded</strong>.
+  A bucket a camera produced while running below its own confidence baseline is
+  <strong>low-confidence</strong>. Both are shown, and both mean "treat as a floor".</p>
+</section>
+
+<section id="edgecases" class="wide">
+  <h2><span class="n">7</span> Edge-case behaviour</h2>
+  <hr class="rule">
+  <p>The scenarios that decide whether the operator still opens the console in month
+  six. Each row is what actually happens, not an aspiration. Every one has a test
+  (<code>docs/edge-cases.md</code> maps them to the code).</p>
+
+  <p class="eyebrow">Camera and stream</p>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Situation</th><th>What the system does</th></tr></thead>
+    <tbody>
+      <tr><td>A camera drops mid-bucket</td><td>The bucket is marked partial and <code>active_cameras</code> is recorded. Counts are never extrapolated to cover the gap.</td></tr>
+      <tr><td>A camera is bumped or re-aimed</td><td>An hourly perceptual hash of the live view diverges from the reference captured at calibration. After two checks past threshold the camera is flagged <code>needs_recalibration</code>, <strong>counting for it stops</strong> (a visible gap beats wrong numbers), and a <code>camera_moved</code> alert fires. Fix the aim, run <code>whaletale-agent --recalibrate</code>, restart the agent.</td></tr>
+      <tr><td>The stream stalls without disconnecting (frozen frame)</td><td>Byte-identical frames for <code>EDGE_FROZEN_FRAME_SECONDS</code> are treated as the camera going offline, exactly like a decode failure.</td></tr>
+      <tr><td>Camera clock drifts</td><td>Not a problem here: every frame is stamped with the box's own clock, never the camera's, so a drifted camera clock cannot reach a bucket. Keep the box on NTP.</td></tr>
+      <tr><td>Resolution or aspect ratio changes</td><td>Zones are stored as normalized coordinates, so they survive it. A flag-for-review signal is not yet emitted.</td></tr>
+      <tr><td>Night mode or IR switch, or direct sun blowing out the image</td><td>The camera's rolling mean detection confidence is tracked and shipped in the heartbeat. Buckets produced while it sits below the 75th percentile of its own history are marked <strong>low-confidence</strong> on the report; a sustained drop raises a <code>low_confidence</code> alert. Self-calibrating: an evenly-lit camera never flags.</td></tr>
+      <tr><td>RTSP credentials rotated by the customer's IT</td><td>The decode error surfaces to the operator with the underlying message. Dedicated "auth failed, re-enter credentials" copy is not yet distinct.</td></tr>
+    </tbody>
+  </table></div>
+
+  <p class="eyebrow" style="margin-top:1.8rem">Detection and tracking</p>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Situation</th><th>What the system does</th></tr></thead>
+    <tbody>
+      <tr><td>A person is occluded then reappears under a new track id</td><td>A re-entry grace window: a fresh track starting within <code>EDGE_REENTRY_SECONDS</code> and <code>EDGE_REENTRY_DISTANCE</code> of a just-dropped track inherits its visit instead of counting a second entry.</td></tr>
+      <tr><td>Someone loiters right on the zone boundary</td><td>The dwell threshold plus separate enter and exit thresholds (hysteresis) stop it flickering entries.</td></tr>
+      <tr><td>Staff walk through the same zone all day</td><td>Draw an <code>excluded</code> zone over the staff corridor or behind the counter. Any detection with its feet inside is dropped before any counting zone sees it, so staff crossings never become entries or dwell.</td></tr>
+      <tr><td>A family of four walks in together</td><td>Counts as four. There is no group de-duplication and there should not be.</td></tr>
+      <tr><td>The site is empty overnight</td><td>The edge emits a bucket only when a zone had activity, so there are no zero-filled 3am rows to misread. Explicit per-site operating hours are not stored yet.</td></tr>
+    </tbody>
+  </table></div>
+
+  <p class="eyebrow" style="margin-top:1.8rem">Zones, tenancy and time</p>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Situation</th><th>What the system does</th></tr></thead>
+    <tbody>
+      <tr><td>A zone drawn with fewer than 3 points, self-intersecting, or outside the frame</td><td>Refused at save, in the editor and again server-side (Shapely).</td></tr>
+      <tr><td>Two zones overlap on one camera</td><td>Allowed (a table inside a patio), but the save returns a conflict listing the overlapping spaces until you set a parent/child relation or explicitly acknowledge the overlap.</td></tr>
+      <tr><td>A space has no tenant for a stretch</td><td>Reported as <strong>vacant</strong>: a hatched state, real information, distinct from missing data.</td></tr>
+      <tr><td>Overlapping tenancies on one space</td><td>Rejected on save; the conflict is shown, naming both tenancies and the overlapping range.</td></tr>
+      <tr><td>A tenancy is edited weeks after the fact</td><td>Allowed. Attribution joins tenancies at query time, so every affected past report recomputes.</td></tr>
+      <tr><td>A recurring tenancy lands on a day the venue was closed</td><td>Cross-referenced against the day annotations and suppressed for that date.</td></tr>
+      <tr><td>An occupant is renamed or merged</td><td>Occupant records are referenced, never copied, so the rename propagates through all history.</td></tr>
+      <tr><td>A recurring Saturday market crosses a DST boundary</td><td>The recurrence uses an RRULE with an explicit timezone; the trailing-weeks shift is done in the site's wall clock, so "10am Saturday" stays aligned.</td></tr>
+      <tr><td>Two operators edit the same zone at once</td><td>Optimistic lock: the second save carries the version it started from, no longer matches, and is refused with a conflict. Reload and reapply.</td></tr>
+    </tbody>
+  </table></div>
+
+  <p class="eyebrow" style="margin-top:1.8rem">System, data and billing</p>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Situation</th><th>What the system does</th></tr></thead>
+    <tbody>
+      <tr><td>The edge box loses internet for days</td><td>Rollups buffer in SQLite. Sync is a watermark: rows are marked shipped only on a 2xx, and the cloud upserts, so a resend after the link returns is harmless. Data is never lost to a WAN outage within retention.</td></tr>
+      <tr><td>A sync payload is delivered twice</td><td>Upsert on <code>(zone_version_id, bucket_start)</code>. Idempotent.</td></tr>
+      <tr><td>The edge disk fills</td><td>Oldest <em>shipped</em> rows are rotated out; unsynced data is never dropped. A <code>disk_low</code> alert fires at 20% free.</td></tr>
+      <tr><td>Power loss mid-write</td><td>SQLite WAL, plus an integrity check on boot. A corrupt file is moved aside and recreated; only buffered-but-unsynced buckets in it are lost, same as a long outage.</td></tr>
+      <tr><td>The edge box is replaced</td><td>Re-pair from Settings with a new token. The historical cloud data is untouched.</td></tr>
+      <tr><td>Edge and cloud schema versions differ</td><td>The cloud rejects a <em>newer</em> payload version (the box keeps buffering until the cloud is updated); older versions are accepted and upgraded.</td></tr>
+      <tr><td>Clock skew between edge and cloud</td><td>Bucket timestamps are authored on the edge in UTC and the cloud stores them verbatim; it never re-stamps.</td></tr>
+      <tr><td>A camera is added mid-billing-period</td><td>The prorated change is shown for confirmation before anything is charged. Removing a camera prorates down at the next period, with no mid-period refund by default.</td></tr>
+      <tr><td>A payment fails</td><td>A grace window, then the console goes read-only. The edge box keeps collecting the entire time, because the data gap would be unrecoverable, so billing never stops collection. On cancel, an export window, then deletion after the stated period.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="systems" class="wide">
+  <h2><span class="n">8</span> Supported systems</h2>
+  <hr class="rule">
+  <div class="tbl-wrap"><table>
+    <tbody>
+      <tr><td style="width:11rem"><strong>Cameras</strong></td><td>ONVIF for discovery (WS-Discovery probe) and optional RTSP-URI lookup; any RTSP/H.264 stream otherwise. The onboarding gate enforces a minimum resolution, a minimum decode FPS, and a passing timed test inference before a camera is accepted. TCP transport is forced for reliability over real networks.</td></tr>
+      <tr><td><strong>Edge hardware</strong></td><td>An x86-64 mini-PC on the property. CPU-only works for a small camera count; the reference box has an NVIDIA RTX 3060 (<code>EDGE_INFERENCE_DEVICE=cuda</code>) and batches inference across streams. Model weights (RT-DETR) download once to a local cache.</td></tr>
+      <tr><td><strong>Operating system</strong></td><td>Linux with systemd for the edge box (<code>edge/deploy/</code> has the units). The cloud runs anywhere Python 3.12 and Postgres 16 do.</td></tr>
+      <tr><td><strong>Network</strong></td><td>Private mesh (Tailscale). All traffic between the edge box, the cloud API, and the console is machine-to-machine over that mesh, with no public ingress and no CORS surface. Only the venue owner and, for remote support, you.</td></tr>
+      <tr><td><strong>Cloud</strong></td><td>Postgres 16, Python 3.12, FastAPI. One instance per deployment. Redis is used for background work; WeasyPrint plus Pango for PDF.</td></tr>
+      <tr><td><strong>Browser</strong></td><td>Current evergreen desktop browsers. The console is a daytime back-office tool and ships <strong>light theme only</strong>, by design.</td></tr>
+      <tr><td><strong>Integrations</strong></td><td>Stripe for per-camera subscription billing (webhook signature-verified, quantity always recomputed server-side). Sentry for exceptions, optional and inert unless <code>SENTRY_DSN</code> is set.</td></tr>
+      <tr><td><strong>What is stored</strong></td><td>15-minute numeric rollups, zone polygons, tenancies, occupant names, heartbeat health. <strong>Never</strong> a frame, crop, bounding box, embedding, or movement path. The privacy claim depends on it, and the edge code enforces it.</td></tr>
+    </tbody>
+  </table></div>
+
+  <hr class="rule" style="margin-top:3rem">
+  <p style="color:var(--ink-soft);font-size:13px">In-repo references: <code>docs/runbook.md</code>
+  (failure-mode tables per milestone), <code>docs/edge-cases.md</code> (the &sect;8 coverage
+  matrix, each row mapped to its test), <code>docs/metrics.md</code> (canonical metric
+  definitions), <code>docs/licenses.md</code> (dependency licensing), <code>DESIGN.md</code>
+  and <code>PRODUCT.md</code> (the console's visual world and product context).</p>
+</section>
+
+</main>
+</div>
+</body>
+</html>
