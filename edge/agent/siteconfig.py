@@ -24,6 +24,7 @@ class ZoneConfig:
     zone_version_id: str
     polygon: list[tuple[float, float]]
     kind: str = "stall"  # spec 5.1 space kind; informational on the edge
+    excluded: bool = False  # spec 8.2: a staff-only mask, not a counting zone
 
     def build_zone(self, *, exit_margin: float, catchment_margin: float) -> Zone:
         return Zone(
@@ -98,11 +99,12 @@ def parse_site_config(raw: object) -> SiteConfig:
                 Zone(zid, polygon)
             except ValueError as exc:
                 raise SiteConfigError(f"{where}: {exc}") from exc
-            zones.append(ZoneConfig(zid, polygon, str(z.get("kind", "stall"))))
+            excluded = bool(z.get("excluded", False))
+            zones.append(ZoneConfig(zid, polygon, str(z.get("kind", "stall")), excluded=excluded))
         cameras.append(CameraConfig(str(cam["name"]), str(cam["source"]), zones))
 
-    if not seen_zone_ids:
-        raise SiteConfigError("no zones defined on any camera")
+    if not any(not z.excluded for c in cameras for z in c.zones):
+        raise SiteConfigError("no counting zones defined on any camera")
 
     return SiteConfig(
         site_id=str(raw["site_id"]),
