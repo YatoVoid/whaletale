@@ -20,6 +20,12 @@ One entry per milestone from the project spec, Section 14.
 - Web: the zone editor loads the current polygon and version instead of starting
   blank, and surfaces the reshape conflict.
 - Test: bucket timestamps are stored verbatim, the cloud never re-stamps (spec 8.4).
+- Cloud: `LoginThrottle` locks a client IP out after 10 failed auth attempts in
+  15 minutes, on the ingest, operator, and admin auth paths. A success clears
+  the key.
+- Cloud: `security_event()` writes one structured line to the `whaletale.security`
+  logger for every auth failure, permission denial, rate-limit hit, and admin
+  action, so they can be shipped somewhere queryable.
 
 ### M1: Prove the pipeline
 - Repository scaffold: layout, `.gitignore`, `.env.example`, pre-commit hooks,

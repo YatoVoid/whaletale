@@ -49,6 +49,16 @@ def test_other_site_is_403(op: dict[str, Any]) -> None:
     assert _get(op, f"/v1/sites/{op['other_site_id']}/spaces").status_code == 403
 
 
+def test_repeated_bad_tokens_get_locked_out(op: dict[str, Any]) -> None:
+    # vibe-check: lock out after failed logins. The default is 10 failures.
+    hdrs = {"Authorization": "Bearer not-a-real-token"}
+    codes = [op["client"].get("/v1/sites", headers=hdrs).status_code for _ in range(12)]
+    assert codes[:10] == [401] * 10
+    assert codes[10:] == [429, 429]
+    # a good token from the same client is now locked out too, until the window passes
+    assert _get(op, "/v1/sites").status_code == 429
+
+
 def test_spaces_list_resolves_current_occupant(op: dict[str, Any]) -> None:
     r = _get(op, f"/v1/sites/{op['res'].site_id}/spaces")
     assert r.status_code == 200

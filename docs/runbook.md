@@ -166,12 +166,19 @@ deferred, with the test that pins each). New this milestone:
   is refused with 409 "this zone changed since you opened it".
 - **API security headers.** Every response carries HSTS, `X-Content-Type-Options`,
   `X-Frame-Options: DENY`, `Referrer-Policy`, and a locked-down CSP.
+- **Auth lockout + security-event log.** After 10 failed auth attempts from one
+  IP in 15 minutes, the ingest / operator / admin auth paths return 429 until
+  the window passes; a successful auth clears the counter. Every auth failure,
+  permission denial, rate-limit hit, and admin action is one line on the
+  `whaletale.security` logger. State is in-process; a scaled deployment moves
+  both the throttle and the rate limiter to Redis.
 
 | Symptom | Cause | Action |
 |---|---|---|
 | Entry counts look low after tuning | `EDGE_REENTRY_DISTANCE` too large in a busy crossing scene, so distinct people get merged | Lower it; check `reentries_merged` against expected occlusion frequency. |
 | Zone save fails with 409 "changed since you opened it" | another operator reshaped the same zone | Reload the editor (it refetches the current version) and reapply. |
 | A partial/deferred §8 item bites in the pilot | see `docs/edge-cases.md` "Deferred, tracked" | Each has a concrete build note; none block the pilot. |
+| An edge box or operator gets 429 on a valid token | 10 failed auth attempts from that IP in the last 15 min tripped the lockout | Wait out the window, or restart the API process to clear in-process state. Check `whaletale.security` for the failing attempts. |
 
 ## Later milestones
 

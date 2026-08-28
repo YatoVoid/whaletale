@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from typing import Annotated
@@ -10,13 +9,21 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from whaletale_cloud import models as m
-from whaletale_cloud.api.security import RateLimiter, hash_token
+from whaletale_cloud.api.security import (
+    LoginThrottle,
+    RateLimiter,
+    hash_token,
+    security_event,
+)
 from whaletale_cloud.db import SessionLocal
-
-log = logging.getLogger("whaletale.api.security")
 
 # One limiter per process. Overridable in tests via app.state.
 rate_limiter = RateLimiter()
+login_throttle = LoginThrottle()
+
+
+def get_login_throttle(request: Request) -> LoginThrottle:
+    return getattr(request.app.state, "login_throttle", login_throttle)
 
 
 def get_session() -> Iterator[Session]:
@@ -43,8 +50,15 @@ def authenticate(
     session: SessionDep,
     authorization: Annotated[str | None, Header()] = None,
 ) -> m.EdgeBox:
+    ip = _client_ip(request)
+    throttle = get_login_throttle(request)
+    if not throttle.allowed(ip):
+        security_event("ingest_auth_locked_out", ip=ip)
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "too many failed attempts")
+
     if not authorization or not authorization.lower().startswith("bearer "):
-        log.warning("ingest auth: missing bearer token from %s", _client_ip(request))
+        throttle.record_failure(ip)
+        security_event("ingest_auth_missing_token", ip=ip)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "missing bearer token")
     token = authorization.split(" ", 1)[1].strip()
     box = session.scalar(
@@ -54,12 +68,14 @@ def authenticate(
         )
     )
     if box is None:
-        log.warning("ingest auth: unknown or revoked token from %s", _client_ip(request))
+        throttle.record_failure(ip)
+        security_event("ingest_auth_invalid_token", ip=ip)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid token")
+    throttle.record_success(ip)
 
     limiter: RateLimiter = getattr(request.app.state, "rate_limiter", rate_limiter)
     if not limiter.allow(box.token_hash):
-        log.warning("ingest rate limit hit for box %s", box.id)
+        security_event("ingest_rate_limited", box_id=box.id, ip=ip)
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "rate limit exceeded")
 
     box.last_seen_at = datetime.now(UTC)
@@ -71,11 +87,11 @@ AuthedBox = Annotated[m.EdgeBox, Depends(authenticate)]
 
 def require_matching_site(box: m.EdgeBox, payload_site_id: str, request: Request) -> None:
     if str(box.site_id) != payload_site_id:
-        log.warning(
-            "site mismatch: box %s (site %s) sent payload for site %s from %s",
-            box.id,
-            box.site_id,
-            payload_site_id,
-            _client_ip(request),
+        security_event(
+            "ingest_site_mismatch",
+            box_id=box.id,
+            token_site=box.site_id,
+            payload_site=payload_site_id,
+            ip=_client_ip(request),
         )
         raise HTTPException(status.HTTP_403_FORBIDDEN, "payload site_id does not match token")
