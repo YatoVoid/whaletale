@@ -30,7 +30,7 @@ jobs:
       - name: pytest
         # Gate covers the defensible logic (zones, counter, config, decode
         # helper, tracker). Raise it as later milestones add testable surface.
-        run: uv run pytest --cov=agent --cov-report=term-missing --cov-fail-under=70
+        run: uv run pytest --cov=agent --cov=sync --cov-report=term-missing --cov-fail-under=70
 
   cloud:
     runs-on: ubuntu-latest

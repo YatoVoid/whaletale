@@ -43,6 +43,21 @@ deployment. `uv run whaletale-report --seed --out report`.
 | Report "flagged as anomalous" for a whole week | The period contains a festival/closure day | Expected. The per-day anomaly table below the headline shows which day and its annotation. |
 | Anomaly table slow on a long period | One `normalize_space` per day, each with its own trailing-weeks queries | Fine for a week or a month. A quarter-long report needs the day loop batched; not done yet. |
 
+## M4: edge agent
+
+`whaletale-agent` (multi-camera capture -> SQLite rollups) and `whaletale-sync`
+(ship rollups + heartbeat) run as systemd services (`edge/deploy/`). Still no
+central alerting - that is M8.
+
+| Symptom | Cause | Action |
+|---|---|---|
+| `journalctl -u whaletale-agent` shows `camera <name>: cannot open source ...` | one camera unreachable; the others keep running | Check the camera's power and the RTSP URL in `/etc/whaletale/site.json`. The agent does not exit for one bad camera. |
+| `whaletale-sync` logs `push failed: <urlerror> (will retry)` repeatedly | WAN down or cloud unreachable | Nothing to do on the box - rollups buffer in SQLite and ship when the link returns. Check `--dry-run` to see the backlog. |
+| SQLite buffer growing without bound | sync has been failing for a long time | Fix connectivity. `prune_synced` only drops *shipped* rows; unsynced data is never discarded (spec 8.4). If the disk is critical, the operator-facing fix is more disk, not data loss. |
+| `error: <path>: file is not a database` on agent start | corrupt SQLite file (power loss before WAL checkpoint, bad disk) | Move the file aside; the agent recreates it. Buffered-but-unsynced buckets in the corrupt file are lost - the gap is unrecoverable, same as a WAN outage past retention. |
+| Buckets look an hour off around a DST change | edge authors `bucket_start` in UTC; nothing re-stamps it | Correct by design (spec 8.4). If it is genuinely wrong, check the box's NTP sync. |
+| `active_cameras` lower than the camera count for some buckets | a camera dropped frames for part of that 15-minute window | Expected; the bucket is not extrapolated (spec 8.1). Persistent low counts mean a flaky camera. |
+
 ## Later milestones
 
 Filled in as each merges. Cloud/site alerting starts at M8.

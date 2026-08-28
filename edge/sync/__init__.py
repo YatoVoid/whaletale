@@ -1,1 +1,3 @@
-"""Watermark sync client. Built in M4."""
+from sync.client import HeartbeatResult, PushResult, SyncClient
+
+__all__ = ["HeartbeatResult", "PushResult", "SyncClient"]

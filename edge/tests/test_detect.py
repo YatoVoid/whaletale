@@ -51,3 +51,15 @@ def test_detect_returns_normalized_boxes(detector: object) -> None:
 def test_blank_frame_has_no_people(detector: object) -> None:
     dets = detector.detect(np.zeros((360, 640, 3), dtype=np.uint8))  # type: ignore[attr-defined]
     assert dets == []
+
+
+def test_detect_batch_returns_one_result_list_per_frame(detector: object) -> None:
+    frames = [_sample_frame(), np.zeros((240, 320, 3), dtype=np.uint8)]
+    out = detector.detect_batch(frames)  # type: ignore[attr-defined]
+    assert len(out) == 2
+    assert out[1] == []  # the blank frame
+    assert all(0.0 <= s <= 1.0 for _b, s in out[0])
+
+
+def test_detect_batch_of_nothing_is_empty(detector: object) -> None:
+    assert detector.detect_batch([]) == []  # type: ignore[attr-defined]

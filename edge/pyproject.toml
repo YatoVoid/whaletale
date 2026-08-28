@@ -16,6 +16,8 @@ dependencies = [
 
 [project.scripts]
 whaletale-edge = "agent.cli:main"
+whaletale-agent = "agent.agent_cli:main"
+whaletale-sync = "sync.sync_cli:main"
 
 [dependency-groups]
 dev = [
@@ -74,4 +76,4 @@ testpaths = ["tests"]
 
 [tool.coverage.run]
 # cli.py is wiring, exercised by the smoke run in docs/runbook.md, not units.
-omit = ["agent/cli.py", "tests/*"]
+omit = ["agent/cli.py", "agent/agent_cli.py", "sync/sync_cli.py", "tests/*"]

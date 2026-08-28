@@ -1,0 +1,23 @@
+[Unit]
+Description=WhaleTale edge sync (ships buffered rollups to the cloud)
+After=network-online.target whaletale-agent.service
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=whaletale
+Group=whaletale
+EnvironmentFile=/etc/whaletale/agent.env
+ExecStart=/opt/whaletale/venv/bin/whaletale-sync --config /etc/whaletale/site.json --interval 60
+Restart=always
+RestartSec=10
+# Sync is idempotent and resumable: a crash mid-push loses nothing, unsynced
+# rows just go again.
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/whaletale
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
