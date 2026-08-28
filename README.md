@@ -66,6 +66,17 @@ uv run whaletale-sync  --config site.json --once       # ship it (needs a cloud 
 
 `edge/deploy/` has the systemd units for a real box.
 
+Onboard a camera (M7):
+
+```bash
+uv run whaletale-onboard --discover                       # WS-Discovery probe
+uv run whaletale-onboard --source rtsp://u:p@cam/stream1 --name front-hall --emit
+```
+
+The gate checks the stream opens, resolution, decode FPS, and a timed test
+inference; `--emit` prints a `site.json` block with the credentials sealed
+(key from `WHALETALE_SITE_SECRET`).
+
 ## Cloud (M2: schema and attribution)
 
 Postgres schema, synthetic seed, and the attribution / metrics / normalization

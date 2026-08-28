@@ -3,7 +3,7 @@ edge wire)."""
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -143,3 +143,37 @@ class ReshapeOut(BaseModel):
     version_number: int
     previous_version_id: UUID | None
     message: str
+
+
+class CameraOut(BaseModel):
+    id: UUID
+    name: str
+    resolution: str
+    fps_target: float
+    status: str
+    last_seen_at: datetime | None
+
+
+class CameraIn(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    resolution: str = Field(pattern=r"^\d+x\d+$")
+    fps_target: float = Field(gt=0)
+    rtsp_url_encrypted: str | None = None
+    credentials_ref: str | None = None
+
+
+class EdgeBoxOut(BaseModel):
+    id: UUID
+    name: str | None
+    agent_version: str | None
+    last_seen_at: datetime | None
+    created_at: datetime
+
+
+class PairEdgeBoxIn(BaseModel):
+    name: str | None = Field(default=None, max_length=200)
+
+
+class PairEdgeBoxOut(BaseModel):
+    id: UUID
+    pairing_token: str  # returned once, never stored in plaintext

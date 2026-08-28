@@ -31,6 +31,20 @@ One entry per milestone from the project spec, Section 14.
 - `whaletale_cloud/schedule.py`: per-day occupant resolution reusing the
   attribution tenancy rules.
 
+### M7: Onboarding
+- `edge/onboarding/`: WS-Discovery camera probe (manufacturer / model / IP from
+  ONVIF scopes), the five-check validation gate (opens < 10s, resolution
+  >= 640x480, decode >= 2 fps, test inference < 200ms, >= 1 clean frame), and
+  Fernet-sealed RTSP credentials keyed from `WHALETALE_SITE_SECRET` (plaintext
+  never reaches the cloud, never logged).
+- `whaletale-onboard` CLI: `--discover`, or `--source URL --name ... --emit` to
+  print a validated `site.json` camera block.
+- Cloud operator API: pair an edge box (token returned once, stored as SHA-256),
+  list/revoke boxes, register and list validated cameras.
+- Console Settings: pair a box, add a camera.
+- Still open: the first-run wizard flow and the zone editor's live detection
+  overlay (needs a frame+detections endpoint from the box).
+
 ### M6: Operator console (frontend, in progress)
 - `web/`: Next.js App Router + TypeScript scaffold. Visual world is a "working
   drawing set" — flat ink on paper, hairline rules, the grid as structure

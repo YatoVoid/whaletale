@@ -25,6 +25,9 @@ Before adding any vision dependency, check its license and add a row here.
 | Video decode | `av` (PyAV, links FFmpeg) | BSD-3-Clause (FFmpeg LGPL, dynamic link) | 2026-08-27 |
 | Tracking | `norfair` | MIT | 2026-08-27 |
 | Polygon geometry | `shapely` | BSD-3-Clause | 2026-08-27 |
+| Credential encryption (M7) | `cryptography` (+ `cffi`, `pycparser`) | Apache-2.0 / BSD-3-Clause | 2026-08-28 |
+| WS-Discovery camera probe (M7) | `wsdiscovery` (+ `ifaddr`) | LGPLv3+ / MIT | 2026-08-28 |
+| ONVIF device query (M7, optional extra) | `onvif-zeep` | MIT | 2026-08-28 |
 | Numerics | `numpy` | BSD-3-Clause | 2026-08-27 |
 | Imaging | `pillow` | MIT-CMU | 2026-08-27 |
 
