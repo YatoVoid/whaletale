@@ -5,9 +5,10 @@ from pathlib import Path
 import numpy as np
 
 from agent.calibration import DriftDetector, RefStore, dhash, hamming
+from agent.detect import Frame
 
 
-def _stripe(x0: int) -> np.ndarray:
+def _stripe(x0: int) -> Frame:
     """A full-height vertical bar - stands in for structure that shifts when a
     camera is re-aimed."""
     a = np.zeros((48, 64, 3), dtype=np.uint8)
