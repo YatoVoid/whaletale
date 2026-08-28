@@ -5,7 +5,7 @@ import logging
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
-from whaletale_cloud.api import heartbeat, ingest
+from whaletale_cloud.api import admin, heartbeat, ingest
 from whaletale_cloud.api.operator import onboarding as operator_onboarding
 from whaletale_cloud.api.operator import routes as operator_routes
 
@@ -15,6 +15,9 @@ MAX_BODY_BYTES = 8 * 1024 * 1024  # spec / vibe-check: cap request size
 
 
 def create_app() -> FastAPI:
+    from whaletale_cloud.observability import init_sentry
+
+    init_sentry()
     app = FastAPI(title="WhaleTale ingest API", version="0.5.0", docs_url=None, redoc_url=None)
 
     @app.middleware("http")
@@ -34,6 +37,7 @@ def create_app() -> FastAPI:
     app.include_router(heartbeat.router)
     app.include_router(operator_routes.router)
     app.include_router(operator_onboarding.router)
+    app.include_router(admin.router)
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:

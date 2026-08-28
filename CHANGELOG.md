@@ -31,6 +31,19 @@ One entry per milestone from the project spec, Section 14.
 - `whaletale_cloud/schedule.py`: per-day occupant resolution reusing the
   attribution tenancy rules.
 
+### M8: Fleet admin + alerts
+- `whaletale_cloud/fleet.py`: derives per-site health and the spec-9 alert
+  conditions from heartbeats — camera dark > 1h (customer-facing, plain
+  language), sync stale > 6h, disk < 20%, mean confidence down > 30% from a
+  trailing baseline, agent version behind. `sync_alerts` upserts one open
+  `alerts` row per condition and resolves those that clear.
+- `heartbeat` gains `disk_total_bytes` (wire + edge + column) so the disk ratio
+  is real; `alerts` table + migration.
+- `/admin/*` API (staff token `WHALETALE_ADMIN_TOKEN`): `GET /admin/fleet`,
+  `POST /admin/fleet/evaluate`, `GET /admin/alerts`. Sentry wired via
+  `SENTRY_DSN`, inert otherwise.
+- Still open: the admin console UI (staff-only, separate from the operator app).
+
 ### M7: Onboarding
 - `edge/onboarding/`: WS-Discovery camera probe (manufacturer / model / IP from
   ONVIF scopes), the five-check validation gate (opens < 10s, resolution

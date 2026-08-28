@@ -144,16 +144,17 @@ class SyncClient:
 
     def heartbeat_payload(self, per_camera: list[dict[str, Any]] | None = None) -> dict[str, Any]:
         try:
-            _total, _used, free = shutil.disk_usage(".")
-            disk_free = int(free)
+            total, _used, free = shutil.disk_usage(".")
+            disk_free, disk_total = int(free), int(total)
         except OSError:
-            disk_free = -1
+            disk_free, disk_total = -1, 0
         return {
             "site_id": self.site_id,
             "agent_version": __version__,
             "schema_version": SCHEMA_VERSION,
             "uptime_seconds": round(time.monotonic() - self._started, 1),
             "disk_free_bytes": disk_free,
+            "disk_total_bytes": disk_total or None,
             "buckets_pending_sync": self.store.pending_count(),
             "last_sync_at": self.last_sync_at,
             "per_camera": per_camera or [],

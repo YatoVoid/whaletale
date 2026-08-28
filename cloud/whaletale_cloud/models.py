@@ -291,6 +291,7 @@ class Heartbeat(Base):
     cpu_percent: Mapped[float | None] = mapped_column()
     mem_percent: Mapped[float | None] = mapped_column()
     disk_free_bytes: Mapped[int] = mapped_column(BigInteger)
+    disk_total_bytes: Mapped[int | None] = mapped_column(BigInteger)
     buckets_pending_sync: Mapped[int] = mapped_column()
     last_sync_at: Mapped[datetime | None] = _utc()
     per_camera: Mapped[list[dict[str, object]]] = mapped_column(JSONB)
@@ -325,4 +326,35 @@ class OperatorUserSite(Base):
     )
     site_id: Mapped[UUID] = mapped_column(
         ForeignKey("sites.id", ondelete="CASCADE"), primary_key=True
+    )
+
+
+class Alert(Base):
+    """A fleet-health condition (spec 9). One open row per (site, box, kind);
+    `resolved_at` is set when the condition clears. Added with M8."""
+
+    __tablename__ = "alerts"
+
+    id: Mapped[UUID] = _pk()
+    site_id: Mapped[UUID] = mapped_column(ForeignKey("sites.id", ondelete="CASCADE"))
+    edge_box_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("edge_boxes.id", ondelete="CASCADE")
+    )
+    kind: Mapped[str] = mapped_column(String(64))  # camera_dark | sync_stale | disk_low | ...
+    severity: Mapped[str] = mapped_column(String(16))  # warning | critical
+    audience: Mapped[str] = mapped_column(String(16))  # us | customer
+    subject: Mapped[str] = mapped_column(String(200))  # e.g. the camera name
+    message: Mapped[str] = mapped_column(String(500))
+    opened_at: Mapped[datetime] = _utc(server_default=text("now()"))
+    resolved_at: Mapped[datetime | None] = _utc()
+
+    __table_args__ = (
+        Index(
+            "uq_alerts_open",
+            "site_id",
+            "kind",
+            "subject",
+            unique=True,
+            postgresql_where=text("resolved_at IS NULL"),
+        ),
     )
