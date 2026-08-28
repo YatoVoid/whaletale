@@ -94,6 +94,32 @@ def test_two_people_one_zone_occupied_is_wall_clock_not_sum() -> None:
     assert c.stats.occupied_seconds == pytest.approx(2.0)
     # Person-seconds sums over people: 2 people * 2 seconds.
     assert c.stats.person_seconds == pytest.approx(4.0)
+    assert c.stats.peak_occupancy == 2
+    assert c.stats.exits == 2  # both left cleanly through the boundary
+    assert c.stats.capture_events == c.stats.entries
+
+
+def test_exit_counted_once_per_clean_boundary_crossing() -> None:
+    c = make_counter(min_dwell=0.0)
+    for t in (0.0, 1.0, 2.0):
+        c.update(t, {1: INSIDE})
+    c.update(3.0, {1: OUTSIDE})  # first exit
+    for t in (4.0, 5.0, 6.0):
+        c.update(t, {1: INSIDE})  # sustained re-entry
+    c.update(7.0, {1: OUTSIDE})  # second exit
+    c.finalize(8.0)
+    assert c.stats.entries == 2
+    assert c.stats.exits == 2
+
+
+def test_track_dropped_while_inside_is_not_an_exit() -> None:
+    c = make_counter(min_dwell=0.0)
+    for t in (0.0, 1.0, 2.0, 3.0):
+        c.update(t, {1: INSIDE})
+    c.end_track(1, 4.0)  # tracker lost the id; the person did not leave the zone
+    c.finalize(5.0)
+    assert c.stats.entries == 1
+    assert c.stats.exits == 0
 
 
 def test_person_seconds_equals_occupied_for_a_lone_visitor() -> None:

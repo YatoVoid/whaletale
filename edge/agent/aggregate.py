@@ -91,6 +91,8 @@ class RunAggregator:
         out = ZoneStats()
         for b in self._buckets:
             out.entries += b.stats.entries
+            out.exits += b.stats.exits
+            out.peak_occupancy = max(out.peak_occupancy, b.stats.peak_occupancy)
             out.passersby += b.stats.passersby
             out.occupied_seconds += b.stats.occupied_seconds
             out.person_seconds += b.stats.person_seconds

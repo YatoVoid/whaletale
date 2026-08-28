@@ -159,6 +159,8 @@ def main(argv: list[str] | None = None) -> int:
         print("  run totals")
 
     print(f"entries           {s.entries}")
+    print(f"exits             {s.exits}")
+    print(f"peak occupancy    {s.peak_occupancy}")
     print(f"passersby         {s.passersby}")
     print(f"capture rate      {s.capture_rate:.0%}")
     print(f"occupied seconds  {s.occupied_seconds:.1f}")
