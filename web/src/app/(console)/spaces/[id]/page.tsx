@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Download } from "lucide-react";
+import { Download, Pencil } from "lucide-react";
 import { AnomalyMark, DegradedMark, VacantTag } from "@/components/marks";
 import { Metric } from "@/components/metric";
 import { OccupancyTimeline } from "@/components/occupancy-timeline";
@@ -40,14 +40,23 @@ export default async function SpaceDetailPage({
             )}
           </p>
         </div>
-        <Link
-          href={`/spaces/${id}/report`}
-          prefetch={false}
-          className="wt-hairline inline-flex items-center gap-1.5 border px-3 py-1.5 text-sm text-ink hover:bg-[color-mix(in_srgb,var(--color-field)_8%,transparent)]"
-        >
-          <Download size={15} strokeWidth={1.5} />
-          Report (PDF)
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/spaces/${id}/zone`}
+            className="wt-hairline inline-flex items-center gap-1.5 border px-3 py-1.5 text-sm text-ink-soft hover:text-ink"
+          >
+            <Pencil size={15} strokeWidth={1.5} />
+            Edit zone
+          </Link>
+          <Link
+            href={`/spaces/${id}/report`}
+            prefetch={false}
+            className="wt-hairline inline-flex items-center gap-1.5 border px-3 py-1.5 text-sm text-ink hover:bg-[color-mix(in_srgb,var(--color-field)_8%,transparent)]"
+          >
+            <Download size={15} strokeWidth={1.5} />
+            Report (PDF)
+          </Link>
+        </div>
       </div>
 
       <p className="mt-4 text-xs text-ink-soft">
