@@ -42,6 +42,7 @@ from whaletale_cloud.validation import (
     ProposedTenancy,
     assert_saveable_polygon,
     find_tenancy_conflicts,
+    find_zone_overlaps,
 )
 
 router = APIRouter(prefix="/v1")
@@ -461,6 +462,32 @@ def reshape_zone(
             status.HTTP_409_CONFLICT,
             "this zone changed since you opened it; reload and reapply your edit",
         )
+
+    if not body.acknowledge_overlap:
+        space = session.get(m.Space, space_id)
+        overlaps = find_zone_overlaps(session, open_primary.camera_id, space_id, body.polygon)
+        confirmed = {space.parent_space_id} if space and space.parent_space_id else set()
+        confirmed |= {
+            s.id
+            for s in session.scalars(select(m.Space).where(m.Space.parent_space_id == space_id))
+        }
+        unconfirmed = [o for o in overlaps if o.space_id not in confirmed]
+        if unconfirmed:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                {
+                    "error": "zone_overlap",
+                    "message": (
+                        "This zone overlaps another zone on the same camera. Set a "
+                        "parent/child relation between the spaces, or acknowledge the "
+                        "overlap to save anyway."
+                    ),
+                    "overlapping_spaces": [
+                        {"space_id": str(o.space_id), "space_name": o.space_name, "iou": o.iou}
+                        for o in unconfirmed
+                    ],
+                },
+            )
 
     now = datetime.now(UTC)
     # spec 5.2.2: never edit geometry in place. Close the current, insert a new.

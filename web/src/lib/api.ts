@@ -6,6 +6,8 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    /** Parsed `detail` when the API returned a structured error object. */
+    readonly detail?: unknown,
   ) {
     super(message);
     this.name = "ApiError";
@@ -37,15 +39,19 @@ export async function api<T>(path: string, opts: Opts = {}): Promise<T> {
   });
 
   if (!res.ok) {
-    let detail = res.statusText;
+    let message = res.statusText;
+    let detail: unknown;
     try {
       const j = (await res.json()) as { detail?: unknown };
-      if (typeof j.detail === "string") detail = j.detail;
-      else if (j.detail) detail = JSON.stringify(j.detail);
+      detail = j.detail;
+      if (typeof j.detail === "string") message = j.detail;
+      else if (j.detail && typeof j.detail === "object" && "message" in j.detail) {
+        message = String((j.detail as { message: unknown }).message);
+      } else if (j.detail) message = JSON.stringify(j.detail);
     } catch {
       /* keep statusText */
     }
-    throw new ApiError(res.status, detail);
+    throw new ApiError(res.status, message, detail);
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;

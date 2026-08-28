@@ -39,6 +39,53 @@ def assert_saveable_polygon(points: list[tuple[float, float]] | list[list[float]
 
 
 @dataclass(frozen=True)
+class ZoneOverlap:
+    space_id: UUID
+    space_name: str
+    iou: float  # intersection over union, 0..1
+
+
+def find_zone_overlaps(
+    session: Session,
+    camera_id: UUID,
+    editing_space_id: UUID,
+    polygon: list[tuple[float, float]] | list[list[float]],
+    *,
+    min_iou: float = 0.02,
+) -> list[ZoneOverlap]:
+    """spec 8.3: two zones on one camera may legitimately overlap (a table
+    inside a patio), but the operator has to confirm it. Returns every other
+    space whose open primary zone on the same camera overlaps the proposed
+    polygon by at least ``min_iou``."""
+    proposed = Polygon([tuple(p) for p in polygon])
+    if not proposed.is_valid or proposed.area == 0.0:
+        return []
+    rows = session.execute(
+        select(m.ZoneVersion, m.Space.name)
+        .join(m.Space, m.Space.id == m.ZoneVersion.space_id)
+        .where(
+            m.ZoneVersion.camera_id == camera_id,
+            m.ZoneVersion.space_id != editing_space_id,
+            m.ZoneVersion.is_primary.is_(True),
+            m.ZoneVersion.effective_to.is_(None),
+        )
+    ).all()
+    out: list[ZoneOverlap] = []
+    for zv, space_name in rows:
+        other = Polygon([tuple(p) for p in zv.polygon])
+        if not other.is_valid or other.area == 0.0:
+            continue
+        inter = proposed.intersection(other).area
+        if inter <= 0.0:
+            continue
+        union = proposed.union(other).area
+        iou = inter / union if union else 0.0
+        if iou >= min_iou:
+            out.append(ZoneOverlap(space_id=zv.space_id, space_name=space_name, iou=round(iou, 4)))
+    return out
+
+
+@dataclass(frozen=True)
 class ProposedTenancy:
     space_id: UUID
     kind: TenancyKind
