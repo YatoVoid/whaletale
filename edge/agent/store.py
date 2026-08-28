@@ -16,7 +16,7 @@ from __future__ import annotations
 import sqlite3
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -57,6 +57,18 @@ CREATE INDEX IF NOT EXISTS ix_observations_unsynced
     ON observations (bucket_start) WHERE synced_at IS NULL;
 CREATE INDEX IF NOT EXISTS ix_site_totals_unsynced
     ON site_totals (bucket_start) WHERE synced_at IS NULL;
+
+-- Latest per-camera health, overwritten in place (spec 8.1, 9). The sync
+-- client reads this into the heartbeat `per_camera` block; it is not itself
+-- synced or history-kept.
+CREATE TABLE IF NOT EXISTS camera_health (
+    camera_name     TEXT PRIMARY KEY,
+    status          TEXT NOT NULL,
+    fps_actual      REAL,
+    mean_confidence REAL,
+    last_frame_at   TEXT,
+    updated_at      TEXT NOT NULL
+);
 """
 
 
@@ -81,6 +93,15 @@ class SiteTotalRecord:
     bucket_start: datetime
     total_people: int
     active_cameras: int
+
+
+@dataclass(frozen=True)
+class CameraHealthRecord:
+    camera_name: str
+    status: str  # "online" | "offline" | "frozen"
+    fps_actual: float | None
+    mean_confidence: float | None
+    last_frame_at: datetime | None
 
 
 class IntegrityError(RuntimeError):
@@ -176,7 +197,37 @@ class BucketStore:
             ),
         )
 
+    def write_camera_health(self, rec: CameraHealthRecord) -> None:
+        self._db.execute(
+            """
+            INSERT INTO camera_health (
+                camera_name, status, fps_actual, mean_confidence, last_frame_at, updated_at
+            ) VALUES (?,?,?,?,?,?)
+            ON CONFLICT(camera_name) DO UPDATE SET
+                status=excluded.status,
+                fps_actual=excluded.fps_actual,
+                mean_confidence=excluded.mean_confidence,
+                last_frame_at=excluded.last_frame_at,
+                updated_at=excluded.updated_at
+            """,
+            (
+                rec.camera_name,
+                rec.status,
+                rec.fps_actual,
+                rec.mean_confidence,
+                _iso(rec.last_frame_at) if rec.last_frame_at else None,
+                _iso(datetime.now(UTC)),
+            ),
+        )
+
     # --- sync-side reads -------------------------------------------------
+
+    def camera_health(self) -> list[dict[str, Any]]:
+        rows = self._db.execute(
+            "SELECT camera_name AS id, status, fps_actual, mean_confidence, last_frame_at "
+            "FROM camera_health ORDER BY camera_name"
+        ).fetchall()
+        return [dict(r) for r in rows]
 
     def unsynced_observations(self, limit: int = 500) -> list[dict[str, Any]]:
         rows = self._db.execute(

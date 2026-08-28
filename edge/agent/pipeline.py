@@ -13,6 +13,7 @@ import threading
 import time
 from collections import Counter
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Protocol
 
@@ -20,7 +21,12 @@ from agent.aggregate import WallClockAggregator, WallClockBucket
 from agent.decode import DecodeError, FrozenFrameDetector, decode_frames
 from agent.detect import BBoxNorm, Frame
 from agent.siteconfig import CameraConfig, SiteConfig
-from agent.store import BucketStore, ObservationRecord, SiteTotalRecord
+from agent.store import (
+    BucketStore,
+    CameraHealthRecord,
+    ObservationRecord,
+    SiteTotalRecord,
+)
 from agent.track import GroundPointTracker
 from agent.zones import ground_point
 
@@ -30,6 +36,16 @@ class Detector(Protocol):
 
 
 Clock = Callable[[], datetime]
+
+
+@dataclass
+class _CamAccum:
+    """Per-camera counters for the current health window, reset on each flush."""
+
+    frames: int = 0
+    score_sum: float = 0.0
+    det_count: int = 0
+    last_at: datetime | None = None
 
 
 class _CameraWorker:
@@ -121,6 +137,7 @@ class MultiCameraPipeline:
         reentry_seconds: float = 0.0,
         reentry_distance: float = 0.0,
         frozen_frame_seconds: float = 30.0,
+        health_flush_seconds: float = 60.0,
         clock: Clock | None = None,
     ) -> None:
         self.site = site
@@ -128,6 +145,11 @@ class MultiCameraPipeline:
         self.store = store
         self._clock: Clock = clock or (lambda: datetime.now(UTC))
         self._fps = fps
+
+        self._health_flush_seconds = health_flush_seconds
+        self._cam_accum: dict[str, _CamAccum] = {c.name: _CamAccum() for c in site.cameras}
+        self._health_window_start = time.monotonic()
+        self._last_health_flush = time.monotonic()
 
         # site-total bookkeeping, keyed by bucket start
         self._site_entries: Counter[datetime] = Counter()
@@ -218,8 +240,41 @@ class MultiCameraPipeline:
                 continue
             results = self.detector.detect_batch([f for _w, _t, f in batch])
             for (w, captured_at, _frame), dets in zip(batch, results, strict=True):
+                acc = self._cam_accum[w.cam.name]
+                acc.frames += 1
+                acc.det_count += len(dets)
+                acc.score_sum += sum(score for _b, score in dets)
+                acc.last_at = captured_at
                 for runner in self._runners_by_cam.get(w.cam.name, []):
                     runner.process(captured_at, dets)
+            if time.monotonic() - self._last_health_flush >= self._health_flush_seconds:
+                self._flush_camera_health()
+
+    def _flush_camera_health(self) -> None:
+        elapsed = max(1e-6, time.monotonic() - self._health_window_start)
+        for w in self._workers:
+            acc = self._cam_accum[w.cam.name]
+            mc = acc.score_sum / acc.det_count if acc.det_count else None
+            if w.error and "frozen" in w.error:
+                status = "frozen"
+            elif w.error or acc.frames == 0:
+                status = "offline"
+            else:
+                status = "online"
+            self.store.write_camera_health(
+                CameraHealthRecord(
+                    camera_name=w.cam.name,
+                    status=status,
+                    fps_actual=round(acc.frames / elapsed, 2),
+                    mean_confidence=round(mc, 4) if mc is not None else None,
+                    last_frame_at=acc.last_at,
+                )
+            )
+            acc.frames = 0
+            acc.score_sum = 0.0
+            acc.det_count = 0
+        self._health_window_start = time.monotonic()
+        self._last_health_flush = time.monotonic()
 
     def close(self) -> None:
         for w in self._workers:
@@ -230,6 +285,7 @@ class MultiCameraPipeline:
         for bstart in sorted(self._site_entries):
             if bstart not in self._site_written:
                 self._flush_site_total(bstart)
+        self._flush_camera_health()
 
     @property
     def worker_errors(self) -> dict[str, str]:
