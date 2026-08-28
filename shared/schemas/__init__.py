@@ -6,6 +6,6 @@ types both derive from these Pydantic models. Do not define the same object
 twice.
 """
 
-from schemas import enums, models
+from schemas import enums, models, wire
 
-__all__ = ["enums", "models"]
+__all__ = ["enums", "models", "wire"]

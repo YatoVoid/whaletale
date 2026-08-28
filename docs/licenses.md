@@ -42,6 +42,9 @@ Before adding any vision dependency, check its license and add a row here.
 | Report templating (M3) | `jinja2` | BSD-3-Clause | 2026-08-28 |
 | HTML to PDF (M3) | `weasyprint` (+ `pydyf`, `tinycss2`, `tinyhtml5`) | BSD-3-Clause | 2026-08-28 |
 | Hyphenation, via WeasyPrint | `pyphen` | GPLv2+ / LGPLv2+ / MPL-1.1 (disjunctive) | 2026-08-28 |
+| Ingest API (M5) | `fastapi` | MIT | 2026-08-28 |
+| ASGI toolkit / server (M5) | `starlette`, `uvicorn` (+ `uvloop`, `httptools`, `websockets`, `watchfiles`) | BSD-3-Clause / MIT | 2026-08-28 |
+| HTTP client, test transport (M5) | `httpx` (+ `anyio`, `h11`) | BSD-3-Clause / MIT | 2026-08-28 |
 
 `psycopg` is LGPL-3.0. Same standing as FFmpeg (Section 3): the library is
 imported unmodified and runs server-side, never distributed to a user, so the

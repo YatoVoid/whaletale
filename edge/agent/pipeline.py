@@ -120,7 +120,6 @@ class MultiCameraPipeline:
         # site-total bookkeeping, keyed by bucket start
         self._site_entries: Counter[datetime] = Counter()
         self._site_cameras: dict[datetime, set[str]] = {}
-        self._site_bucket_end: dict[datetime, datetime] = {}
         self._site_written: set[datetime] = set()
 
         self._runners: list[_ZoneRunner] = []
@@ -166,7 +165,6 @@ class MultiCameraPipeline:
             )
             self._site_entries[b.start] += s.entries
             self._site_cameras.setdefault(b.start, set()).add(camera_name)
-            self._site_bucket_end[b.start] = b.end
             self._write_completed_site_totals(before=b.start)
 
         return on_bucket
@@ -182,7 +180,6 @@ class MultiCameraPipeline:
             SiteTotalRecord(
                 site_id=self.site.site_id,
                 bucket_start=bstart,
-                bucket_end=self._site_bucket_end[bstart],
                 total_people=self._site_entries[bstart],
                 active_cameras=len(self._site_cameras.get(bstart, set())),
             )

@@ -84,8 +84,22 @@ Without `WHALETALE_TEST_DATABASE_URL` the tests start a throwaway Postgres
 container (needs Docker). Every schema change is an Alembic migration; CI fails
 if the models and the migration head disagree.
 
-Shared types live in `shared/schemas/` (Pydantic v2). The cloud ORM mirrors them
-and a test fails on drift. TypeScript generation arrives with the web app in M6.
+Shared types live in `shared/schemas/` (Pydantic v2): the persisted-row models
+and, from M5, the edge/cloud sync wire contract (`wire.py`). The cloud ORM
+mirrors the row models and a test fails on drift. TypeScript generation arrives
+with the web app in M6.
+
+### Ingest API (M5)
+
+```bash
+cd cloud
+DATABASE_URL=postgresql+psycopg://whaletale:whaletale@localhost:5432/whaletale \
+  uv run whaletale-api --port 8000
+```
+
+`POST /v1/ingest` and `POST /v1/heartbeat` take a per-box pairing token
+(`Authorization: Bearer ...`). Pair a box with `pair_edge_box()` (the operator
+console does this in M7). The edge's `whaletale-sync` targets this API.
 
 The M3 report (Section 11 one-pager) is generated from seeded data:
 

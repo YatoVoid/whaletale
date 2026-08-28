@@ -14,6 +14,9 @@ dependencies = [
     "shapely>=2.0.6",
     "jinja2>=3.1.4",
     "weasyprint>=63.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "httpx>=0.27.0",
 ]
 
 [dependency-groups]
@@ -28,6 +31,7 @@ dev = [
 
 [project.scripts]
 whaletale-report = "whaletale_cloud.report_cli:main"
+whaletale-api = "whaletale_cloud.api.run:main"
 
 [tool.uv]
 package = true
@@ -76,8 +80,17 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+filterwarnings = [
+    # starlette's TestClient warns to switch to httpx2 (not yet stable).
+    "ignore:Using .httpx. with .starlette.testclient.",
+]
 
 [tool.coverage.run]
-# db.py and report_cli.py are runtime wiring / entrypoints, exercised by the app
-# (`whaletale-report`), not units.
-omit = ["tests/*", "migrations/*", "whaletale_cloud/db.py", "whaletale_cloud/report_cli.py"]
+# Runtime wiring / entrypoints, exercised by the running app, not units.
+omit = [
+    "tests/*",
+    "migrations/*",
+    "whaletale_cloud/db.py",
+    "whaletale_cloud/report_cli.py",
+    "whaletale_cloud/api/run.py",
+]

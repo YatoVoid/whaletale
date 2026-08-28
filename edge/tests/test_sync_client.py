@@ -30,7 +30,7 @@ def _seed_store(path: Path, n: int = 3) -> BucketStore:
                 capture_events=10 + i,
             )
         )
-    s.write_site_total(SiteTotalRecord("site-1", B0, B0 + timedelta(minutes=15), 200, 2))
+    s.write_site_total(SiteTotalRecord("site-1", B0, 200, 2))
     return s
 
 
